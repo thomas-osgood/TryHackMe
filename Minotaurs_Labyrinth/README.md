@@ -16,7 +16,7 @@ function pwdgen() {
 // 
 ```
 
-The [golang program](extract_password.go) in this repository:
+The [golang program](stage1.go) in this repository:
 
 > 1. reaches out to the target and pulls down the `login.js` file
 > 2. searches for the password arrays (`a`, `b`, `c`)
@@ -47,6 +47,9 @@ Command To Execute Stage 2:
 ```bash
 ./exploit.py $TARGET daedalus <password> stage2 -a
 ```
+
+*Note
+The [script](exploit.py) for stage 2 is alsoused to execute stage 3, becuase stage 3 uses some of the same process as stage 2.*
 
 ### Stage 3: Foothold
 

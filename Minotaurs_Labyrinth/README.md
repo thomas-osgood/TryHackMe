@@ -28,7 +28,7 @@ The attacker can then use these credentials to either login to the site and proc
 
 ### Stage 2: SQLi Injector
 
-To leverage the credentials obtained in the [first attack](#Password Grabber) a tool was written in Python3. This tool extracts users and password hashes from the database using a SQLi vulnerability present in the dashboard of an authenticated user. 
+To leverage the credentials obtained in the first attack a tool was written in Python3. This tool extracts users and password hashes from the database using a SQLi vulnerability present in the dashboard of an authenticated user. 
 
 After the user authenticates, they are brought to a dashboard where they can search for people and creatures. This search form reaches out and contacts `api/<creatures/people>/search` and has a SQL injection (SQLi) vulnerability present. If an attacker inputs the search string `' OR 1=1;--` they will get a dump of all the creatures or people in the database. This also displays the creatures' and people's password hashes.
 

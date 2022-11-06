@@ -243,8 +243,6 @@ func main() {
 		os.Exit(1)
 	}
 	SucMsg(fmt.Sprintf("Login Credentials: \"daedalus:%s\"", password))
-
-	c.Login("daedalus", password)
 	return
 }
 

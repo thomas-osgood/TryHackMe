@@ -323,9 +323,11 @@ func main() {
 	var targetPort int
 	var targetIP string
 	var baseURL string
+	var scriptName string
 
 	flag.StringVar(&targetIP, "i", "127.0.0.1", "target IP address")
 	flag.IntVar(&targetPort, "p", 80, "target port")
+	flag.StringVar(&scriptName, "s", "login.js", "filename to save pulled down js file under")
 
 	flag.Parse()
 
@@ -341,14 +343,14 @@ func main() {
 	}
 	c.Session.Jar = sessionjar
 
-	success, message := c.GetScript("login.js")
+	success, message := c.GetScript(scriptName)
 	if !success {
 		ErrMsg(message)
 		os.Exit(1)
 	}
 	SucMsg(message)
 
-	password, success, message := DecodePassword("login.js")
+	password, success, message := DecodePassword(scriptName)
 	if !success {
 		ErrMsg(message)
 		os.Exit(1)

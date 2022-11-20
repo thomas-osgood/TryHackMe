@@ -180,7 +180,7 @@ func main() {
 
 	baseURL = fmt.Sprintf("http://%s:%d", targetIP, targetPort)
 
-	FindUsername(baseURL, "names_short.txt", threadCount)
+	FindUsername(baseURL, wordlist, threadCount)
 	return
 }
 

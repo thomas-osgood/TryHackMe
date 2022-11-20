@@ -108,8 +108,8 @@ func ValidatePort(portno int) (valid bool, message string) {
 }
 
 func ValidateThreadCount(threadcount int) (valid bool, message string) {
-	if (threadcount < 1) || (threadcount > 100) {
-		return false, "thread count must be in range 1 - 100"
+	if (threadcount < 1) || (threadcount > 50) {
+		return false, "thread count must be in range 1 - 50"
 	}
 
 	return true, "thread count valid"

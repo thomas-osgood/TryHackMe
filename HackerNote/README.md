@@ -9,9 +9,11 @@ This program is written in `Golang` and designed to brute-force valid usernames 
 ## Command-Line Arguments
 
 1. `-i` : IP address (or domain) of target machine.
-2. `-p`: Port used to communicate with target.
-3. `-t`: Number of threads to spawn during brute-force attempt.
-4. `-w`: Wordlist to use for brute-force attempt.
+2. `-l`: Attempt to brute-force password of discovered user(s).
+3. `-p`: Port used to communicate with target.
+4. `-t`: Number of threads to spawn during brute-force attempt.
+5. `-P`: Wordlist to use for password brute-force attempt.
+6. `-U`: Wordlist to use for username brute-force attempt.
 
 ## Defaults
 
@@ -53,5 +55,11 @@ Attack Target Using 50 Threads:
 Attack Target Using Non-Default Wordlist:
 
 ```bash
-./find_users -i $TARGET -w <path_to_wordlist>
+./find_users -i $TARGET -U <path_to_wordlist>
+```
+
+Attack Target And Attempt To Brute Password:
+
+```bash
+./find_users -i $TARGET -P <path_to_wordlist> -l
 ```

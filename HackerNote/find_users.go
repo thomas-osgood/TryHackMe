@@ -50,7 +50,7 @@ var SESSIONS_GRANTED http.Client = http.Client{Timeout: 30 * time.Second}
 
 var TIMEOUT float64
 
-//============================================================
+// ============================================================
 //
 // Function Name: GrabSSHPass
 //
@@ -58,20 +58,20 @@ var TIMEOUT float64
 //
 // Description:
 //
-//    This function is designed to contact the note/list API
-//    endpoint and pull out the SSH key for the user.
+//	This function is designed to contact the note/list API
+//	endpoint and pull out the SSH key for the user.
 //
 // Input(s):
 //
-//    baseURL - string. base URL to use for HTTP request.
+//	baseURL - string. base URL to use for HTTP request.
 //
 // Return(s):
 //
-//    sshpass - string. ssh password extracted from endpoint.
-//    success - bool. indication of successful execution.
-//    message - string. status message.
+//	sshpass - string. ssh password extracted from endpoint.
+//	success - bool. indication of successful execution.
+//	message - string. status message.
 //
-//============================================================
+// ============================================================
 func GrabSSHPass(baseURL string) (sshpass string, success bool, message string) {
 	var notesreturned []Note = []Note{}
 	var notecontent Note = Note{}
@@ -101,7 +101,7 @@ func GrabSSHPass(baseURL string) (sshpass string, success bool, message string) 
 	return sshpass, true, "SSH password grabbed"
 }
 
-//============================================================
+// ============================================================
 //
 // Function Name: WordlistGenerator
 //
@@ -109,20 +109,20 @@ func GrabSSHPass(baseURL string) (sshpass string, success bool, message string) 
 //
 // Description:
 //
-//    This function is designed to loop through a wordlist
-//    and feed the data into a string channel line-by-line.
+//	This function is designed to loop through a wordlist
+//	and feed the data into a string channel line-by-line.
 //
 // Input(s):
 //
-//    wordlist - string. file containing words to loop through.
-//    c - chan string. channel to send words into.
+//	wordlist - string. file containing words to loop through.
+//	c - chan string. channel to send words into.
 //
 // Return(s):
 //
-//    success - bool. indication of successful execution.
-//    message - string. status message.
+//	success - bool. indication of successful execution.
+//	message - string. status message.
 //
-//============================================================
+// ============================================================
 func WordlistGenerator(wordlist string, c chan string) (success bool, message string) {
 	defer close(c)
 
@@ -142,7 +142,7 @@ func WordlistGenerator(wordlist string, c chan string) (success bool, message st
 	return true, "worlist looped through successfully"
 }
 
-//============================================================
+// ============================================================
 //
 // Function Name: TestCreds
 //
@@ -150,21 +150,21 @@ func WordlistGenerator(wordlist string, c chan string) (success bool, message st
 //
 // Description:
 //
-//    This function is designed to attempt a brute-force
-//    attack against a target URL. It loops through the
-//    usernames that have been discovered and saved and
-//    attempts to find valid login credentials.
+//	This function is designed to attempt a brute-force
+//	attack against a target URL. It loops through the
+//	usernames that have been discovered and saved and
+//	attempts to find valid login credentials.
 //
 // Input(s):
 //
-//    targetURL - string. full URL of the login page.
-//    passwordlist - string. file containng list of passwords.
+//	targetURL - string. full URL of the login page.
+//	passwordlist - string. file containng list of passwords.
 //
 // Return(s):
 //
-//    None.
+//	None.
 //
-//============================================================
+// ============================================================
 func TestCreds(targetURL string, passwordlist string) {
 	var datachan chan string = make(chan string)
 	var exitflag bool
@@ -181,7 +181,7 @@ func TestCreds(targetURL string, passwordlist string) {
 	return
 }
 
-//============================================================
+// ============================================================
 //
 // Function Name: TestPassword
 //
@@ -189,22 +189,22 @@ func TestCreds(targetURL string, passwordlist string) {
 //
 // Description:
 //
-//    This function is designed to loop through a wordlist
-//    and test the usernames read from the channel.
+//	This function is designed to loop through a wordlist
+//	and test the usernames read from the channel.
 //
 // Input(s):
 //
-//    targetURL - string. full URL of the login page.
-//    username - string. username to test creds of.
-//    c - chan string. channel to get passwords from.
-//    wg - *sync.WaitGroup. waitgroup the thread belongs to.
-//    exitflag - *bool. indicates successful credential found.
+//	targetURL - string. full URL of the login page.
+//	username - string. username to test creds of.
+//	c - chan string. channel to get passwords from.
+//	wg - *sync.WaitGroup. waitgroup the thread belongs to.
+//	exitflag - *bool. indicates successful credential found.
 //
 // Return(s):
 //
-//    None.
+//	None.
 //
-//============================================================
+// ============================================================
 func TestPassword(targetURL string, username string, c chan string, wg *sync.WaitGroup, exitflag *bool) {
 	defer wg.Done()
 	var logindata LoginRequestData = LoginRequestData{Username: username}
@@ -257,7 +257,7 @@ func TestPassword(targetURL string, username string, c chan string, wg *sync.Wai
 	return
 }
 
-//============================================================
+// ============================================================
 //
 // Function Name: TestPassword
 //
@@ -265,20 +265,20 @@ func TestPassword(targetURL string, username string, c chan string, wg *sync.Wai
 //
 // Description:
 //
-//    This function is designed to test the validity of
-//    a username.
+//	This function is designed to test the validity of
+//	a username.
 //
 // Input(s):
 //
-//    targetURL - string. full URL of the login page.
-//    c - chan string. channel to get passwords from.
-//    wg - *sync.WaitGroup. waitgroup the thread belongs to.
+//	targetURL - string. full URL of the login page.
+//	c - chan string. channel to get passwords from.
+//	wg - *sync.WaitGroup. waitgroup the thread belongs to.
 //
 // Return(s):
 //
-//    None.
+//	None.
 //
-//============================================================
+// ============================================================
 func TestUsername(targetURL string, c chan string, wg *sync.WaitGroup) {
 	defer wg.Done()
 	var logindata LoginRequestData = LoginRequestData{Password: "invalidpassword!"}
@@ -314,7 +314,7 @@ func TestUsername(targetURL string, c chan string, wg *sync.WaitGroup) {
 	return
 }
 
-//============================================================
+// ============================================================
 //
 // Function Name: FindUsername
 //
@@ -322,21 +322,21 @@ func TestUsername(targetURL string, c chan string, wg *sync.WaitGroup) {
 //
 // Description:
 //
-//    This function is designed to spawn multiple threads
-//    used to brute-force a username.
+//	This function is designed to spawn multiple threads
+//	used to brute-force a username.
 //
 // Input(s):
 //
-//    baseURL - string. root URL for the target.
-//    wordlist - string. wordlist to use for username brute.
-//    threadcount - int. number of threads to spawn for brute.
+//	baseURL - string. root URL for the target.
+//	wordlist - string. wordlist to use for username brute.
+//	threadcount - int. number of threads to spawn for brute.
 //
 // Return(s):
 //
-//    success - bool. indication of username found.
-//    message - string. status message.
+//	success - bool. indication of username found.
+//	message - string. status message.
 //
-//============================================================
+// ============================================================
 func FindUsername(baseURL string, wordlist string, threadcount int) (success bool, message string) {
 	var namechan chan string = make(chan string)
 	var wg *sync.WaitGroup = new(sync.WaitGroup)
@@ -366,7 +366,7 @@ func FindUsername(baseURL string, wordlist string, threadcount int) (success boo
 	return success, message
 }
 
-//============================================================
+// ============================================================
 //
 // Function Name: SSHConnection
 //
@@ -374,24 +374,27 @@ func FindUsername(baseURL string, wordlist string, threadcount int) (success boo
 //
 // Description:
 //
-//    This function is designed to initialize an SSH
-//    connection with the target machine using a discovered
-//    username and credentials. Right now, the attacker must
-//    manually enter the credentials. Once the credentials are
-//    entered, a stable SSH connection will be opened with the
-//    target machine.
+//	This function is designed to initialize an SSH
+//	connection with the target machine using a discovered
+//	username and credentials. Right now, the attacker must
+//	manually enter the credentials. Once the credentials are
+//	entered, a stable SSH connection will be opened with the
+//	target machine.
 //
 // Input(s):
 //
-//    targetIP - string. IP address of target.
+//	targetIP - string. IP address of target.
 //
 // Return(s):
 //
-//    success - bool. indication of successful SSH attempt.
-//    message - string. status message.
+//	success - bool. indication of successful SSH attempt.
+//	message - string. status message.
 //
-//============================================================
+// ============================================================
 func SSHConnection(targetIP string) (success bool, message string) {
+	success = true
+	message = "SSH connection successful"
+
 	for i := 0; i < 60; i++ {
 		fmt.Printf("=")
 	}
@@ -410,7 +413,11 @@ func SSHConnection(targetIP string) (success bool, message string) {
 
 	go io.Copy(os.Stdout, readpipe)
 
-	cmd.Run()
+	err := cmd.Run()
+	if err != nil {
+		success = false
+		message = err.Error()
+	}
 
 	fmt.Printf("\n\n")
 	for i := 0; i < 60; i++ {
@@ -423,7 +430,7 @@ func SSHConnection(targetIP string) (success bool, message string) {
 	}
 	fmt.Printf("\n\n")
 
-	return true, "SSH connection successful"
+	return success, message
 }
 
 func ValidatePort(portno int) (valid bool, message string) {
@@ -563,4 +570,3 @@ func main() {
 	}
 	return
 }
-

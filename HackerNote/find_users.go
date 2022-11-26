@@ -466,6 +466,7 @@ func SSHConnection(targetIP string, sshpassword string) (success bool, message s
 
 func PrintChar(c byte, n int) {
 	fmt.Printf("\n")
+	fmt.Printf(ANSI_CLRLN)
 	for i := 0; i < n; i++ {
 		fmt.Printf(string(c))
 	}

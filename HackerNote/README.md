@@ -4,6 +4,10 @@
 
 This program is written in `Golang` and designed to brute-force valid usernames using a timing attack. This is designed to be faster than the `Python3` implementation of the brute-force attack because it is multi-threaded via the use of go routines. 
 
+If login credentials are discovered, the program automatically logs into the site, and pulls down the SSH credentials from the restricted area.
+
+Once the SSH credentials are pulled down, `find_users.go` automatically creates an SSH connection with the target and spawns a stable shell for the attacker.
+
 *Note: The maximum number of go routines is limited to 50 to reduce the chances of DoS'ing the target.*
 
 ## Command-Line Arguments

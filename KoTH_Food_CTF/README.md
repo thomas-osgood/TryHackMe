@@ -36,7 +36,33 @@ resp = requests.post(target, "whoami".encode())
 
 The output of the above command reveals the username of the user hosting the site, and confirms the ability to remotely execute arbitrary code on the target machine. To make this less manual, I created [monitor_rce](monitor_rce.py). This will automatically format and execute a command given by the user and print the output to `STDOUT`.  Using eith the manual method or [monitor_rce](monitor_rce.py), it is possible to upload a reverse shell, gain a meterpreter session, etc.
 
-One we have a foothold on the target, we can begin to explore and search for a flag. 
+One we have a foothold on the target, we can begin to explore and search for a flag. When you run `ls -la ~` to view the current user's home directory, there is a file that is called `flag`. When we try to `cat flag`, however, we get a permission denied error.  To read this, we must elevate our privilege. 
+
+First, to gain more stability with out shell, we can create an SSH key pair and SSH into the target as `bread` by creating an `.ssh` directory with an `authorized_keys` file in `bread`'s home directory.
+
+Commands:
+
+```bash
+mkdir /home/bread/.ssh
+touch /home/bread/.ssh/authorized_keys
+```
+
+After the `authorized_keys` file is created, we can generate an SSH key pair on our attack machine and place the contents of `<our_key_name>.pub` in `authorized_keys`. From there we can SSH into the box as bread and continue our attack.
+
+Command (On Attack Machine):
+
+```bash
+ssh-keygen
+
+... <enter info as prompted> ...
+
+cat <your_key_name>.pub
+
+... <copy contents to authorized_keys on target> ...
+
+ssh bread@$TARGET -i <your_key_name>
+```
+
 
 ### Monitor_RCE
 

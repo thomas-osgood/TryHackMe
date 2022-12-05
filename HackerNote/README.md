@@ -67,3 +67,9 @@ Attack Target And Attempt To Brute Password:
 ```bash
 ./find_users -i $TARGET -P <path_to_wordlist> -l
 ```
+
+## Eaxmple Run
+
+The following screenshot was taken during an execution of the program, with the `-l` option specified. Upon gaining the user credentials, it logged into the target, grabbed the SSH credentials, and opened an SSH connection  with the target machine.
+
+![Example Run](../media/pictures/hackernote_findUsers_1.png "Example Run")

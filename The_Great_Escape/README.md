@@ -98,11 +98,9 @@ try {
 
 What is happening here is, the site takes the `url` parameter we pass to it, and passes it as a `url` parameter to `api-dev-backup:8080/exif`, but it only allows valid URLs to be passed. This opens the site up to a Server Side Request Forgery attack (SSRF). If we pass `http://api-dev-backup:8080/exif` with a custom `url` parameter, we can get the site to make a malicious request on our behalf and gain Remote Code Execution (RCE).
 
-## Exploit Currently Under Construction
+## Custom Exploit (Golang)
 
-I am currently working on automating the entire process. Certain pieces have been automated, but it is not complete. 
-
-The ports are now automatically extrated from the target machine.
+To automate the exploitation of this machine, a golang program was written and can be found [here](exploit.go).  This program extracts two flags and opens up a closed port using a technique known as `Port Knocking`. After the program has successfully executed, the user can execute Docker commands on the target machine and gain access to the root file system and final flag.
 
 ## Screenshots
 

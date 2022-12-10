@@ -7,6 +7,7 @@ Collection of scripts for various TryHackMe.com rooms
 2. [HackerNote](HackerNote/README.md)
 3. [KoTH Food CTF](KoTH_Food_CTF/README.md)
 4. [OhMyWebserver](OhMyWebserver/README.md) 
+5. [Pickle_Rick](Pickle_Rick/README.md)
 
 ## Boot To Root Programs
 

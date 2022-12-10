@@ -140,6 +140,16 @@ This reveals some ports to knock to open the docker remote admin port, and a fla
 
 ![GitFlag](../media/pictures/the_great_escape_RCE3.png)
 
+The simplest way to knock the ports is to create a shell script that loops through the ports (in the order they are provided in the document) and performs an nmap scan on that port.
+
+```bash
+for port in {<port_list>}; do nmap -p $port $TARGET; done
+```
+
+After the ports have been knocked, we can navigate to the Docker port (`2375`) and find the Docker API running and accessible. To view all the containers running, and to get a better understanding of what is going on on the target, we can dump all the container information by navigating to `http://$TARGET:2375/containers/json`.  
+
+For more information regarding the Docker API, check out the documentation [here](https://docs.docker.com/engine/api/). 
+
 ## Custom Exploit (Golang)
 
 To automate the exploitation of this machine, a golang program was written and can be found [here](exploit.go).  This program extracts two flags and opens up a closed port using a technique known as `Port Knocking`. After the program has successfully executed, the user can execute Docker commands on the target machine and gain access to the root file system and final flag.

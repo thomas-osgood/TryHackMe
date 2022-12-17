@@ -48,3 +48,70 @@ Not everything about enumeration can be automated, so we should look at the site
 
 ![WaveFireSite](../media/pictures/archangel_wavefire_site.png)
 
+When we navigate to `mafialive.thm` we are greeted with a basic HTML page that tells us it is under development and gives us a flag.
+
+![MafialiveMain](../media/pictures/archangel_underdev_main.png)
+
+Now we can begin to enumerate this site for hidden directories.
+
+Command:
+
+```bash
+gobuster dir -u http://mafialive.thm -w <wordlist> -t 50 -x php -o mafialive_main
+```
+
+Output:
+
+```bash
+===============================================================
+Gobuster v3.1.0
+by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
+===============================================================
+[+] Url:                     http://mafialive.thm
+[+] Method:                  GET
+[+] Threads:                 50
+[+] Wordlist:                /usr/share/wordlists/SecLists/Discovery/Web-Content/raft-small-directories-lowercase.txt
+[+] Negative Status codes:   404
+[+] User Agent:              gobuster/3.1.0
+[+] Extensions:              php
+[+] Timeout:                 10s
+===============================================================
+2022/12/16 20:05:53 Starting gobuster in directory enumeration mode
+===============================================================
+/test.php             (Status: 200) [Size: 286]
+/server-status        (Status: 403) [Size: 278]
+                                               
+===============================================================
+2022/12/16 20:06:52 Finished
+===============================================================
+```
+
+We have discovered a `test.php` page and nothing else. Taking a look at this page, there is a simple button on it that displays a phrase when we click it. Looking at the URL,  however, discloses a parameter `view` whose value is a filepath.
+
+![MafialiveTest1](../media/pictures/archangel_underdev_test1.png)
+
+Let's see if we can get the source for the `test.php` page by replacing `mrrobot.php` with `test.php`. A basic replace didn't work, so we can try using a PHP filter to convert it to base64 and smuggle it out. By replacing `/var/www/html/development_testing/mrrobot.php` with `php://filter/convert.base64-encode/resource=/var/www/html/development_testing/test.php` we can get the base64 encoded source code returned to us. 
+
+Source:
+
+```php
+<?php
+//FLAG: <REDACTED FOR WRITEUP>
+function containsStr($str, $substr) {
+	return strpos($str, $substr) !== false;
+}
+if(isset($_GET["view"])){
+	if(!containsStr($_GET['view'], '../..') && containsStr($_GET['view'], '/var/www/html/development_testing')) {
+		include $_GET['view'];
+	}else{
+		echo 'Sorry, Thats not allowed';
+	}
+}
+?>
+```
+
+The part we are intersted in is the `<?php ... ?>` piece where the hidden PHP code is written. This shows us a few interesting things we can use to our advantage: 1) `/var/www/html/development_testing` must be in the `view` parameter and 2) the path cannot contain `../..`. The simple filter imposed by the code is easy to get around by adding an additional `/` to `../..`, turning it into `..//..`. Next we can perform a path traversal to any location the user running the website has access to by walking up the directory tree starting at `/var/www/html/development_testing` using `..//..`. We can test this to make sure our theory is correct by targeting `?view=/var/www/html/development_testing/..//..//..//..//..//..//../etc/passwd`.
+
+![MafialiveTestLFIConfirm](../media/pictures/archangel_underdev_test2.png)
+
+When we attempt the LFI attack, we successfully get back the `/etc/passwd` file. This confirms our theory. 

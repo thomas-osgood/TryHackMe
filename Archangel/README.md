@@ -86,6 +86,8 @@ by OJ Reeves (@TheColonial) & Christian Mehlmauer (@firefart)
 ===============================================================
 ```
 
+## Local File Inclusion (LFI)
+
 We have discovered a `test.php` page and nothing else. Taking a look at this page, there is a simple button on it that displays a phrase when we click it. Looking at the URL,  however, discloses a parameter `view` whose value is a filepath.
 
 ![MafialiveTest1](../media/pictures/archangel_underdev_test1.png)

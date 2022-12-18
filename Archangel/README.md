@@ -136,3 +136,5 @@ http://mafialive.thm/test.php?view=/var/www/html/development_testing/../../../..
 ```
 
 Now when you go back and check the log, the contents of `/etc/passwd` should be in the location of that request's `User-Agent`.
+
+*Note: To manipulate the header information (where the User-Agent is stored), you will need a tool like BurpSuite or to send the request using Python, PHP, Go, etc.*

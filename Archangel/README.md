@@ -117,3 +117,22 @@ The part we are intersted in is the `<?php ... ?>` piece where the hidden PHP co
 ![MafialiveTestLFIConfirm](../media/pictures/archangel_underdev_test2.png)
 
 When we attempt the LFI attack, we successfully get back the `/etc/passwd` file. This confirms our theory. 
+
+
+## Remote Code Execution (RCE)
+
+Reading file content is good, but executing arbitraty commands is better. How, then, can we achieve our objective? The answer: `Log Poisoning`. Since we can read local files, we can read the server's log file. We also know that this site is written in PHP, meaning we may be able to inject a command into the log and have the server execute it for us. Webserver logs generally log the IP address of the requesting machine, the path, response code, user-agent, and time. Out of these, we have control over the path and user-agent. We are using the path to read files, meaning the user-agent is what we will poison the log with. 
+
+By injecting PHP into the `User-Agent` header, we can add a URL parameter to the site. This URL parameter is where we will add the command we want to run. Let's assume we want to add a new parameter `c` using log poisoning via the `User-Agent`.  To achieve this, we will replace the existing `User-Agent` with the following:
+
+```php
+<?php system($_GET['c']); ?>
+```
+
+When the server gets a request with the above payload as the `User-Agent`, it will evaluate it and execute the PHP code. After this parameter is injected, we can make a request to the server that looks like:
+
+```bash
+http://mafialive.thm/test.php?view=/var/www/html/development_testing/../../../../../var/log/apache2/access.log&c=cat /etc/passwd
+```
+
+Now when you go back and check the log, the contents of `/etc/passwd` should be in the location of that request's `User-Agent`.

@@ -137,4 +137,16 @@ http://mafialive.thm/test.php?view=/var/www/html/development_testing/../../../..
 
 Now when you go back and check the log, the contents of `/etc/passwd` should be in the location of that request's `User-Agent`.
 
+We only have to poison the log in one place, one time, and every time we enter that command, the poisoned location will be updated. 
+
 *Note: To manipulate the header information (where the User-Agent is stored), you will need a tool like BurpSuite or to send the request using Python, PHP, Go, etc.*
+
+## Privilege Escalation (Horizontal)
+
+Once we have uploaded a reverse shell using log poisoning and gotten a foothold on the target machine, we can begin to escalate our privileges. First, we look in the `/home` directory to see what users there are and if we are allowed to access any of the home directories. In this case there is one user `Archangel` and we are allowed to view his home directory and discover a `user.txt` file containing a flag. 
+
+Getting that flag was good, but we don't really have much leverage on this machine as the current user (`www-data`).  Running the find command for SUID binaries and the GETCAP command for capabilities does not turn up anything we can use to abuse the machine.  Looking in the crontab, however, shows us that `Archangel` is running a script every minute.
+
+![crontab](../media/pictures/archangel_crontab.png)
+
+When we take a look at the file referenced, we notice we have write permissions, meaning we can insert a reverse shell or our own script to gain a shell as `Archangel`.  All we have to do is overwrite the existing `/opt/helloworld.sh` file and wait for the cron job to run, then we will become `Archangel`. After we gain the shell we can navigate back to `/home/archangel` and look in `secret` to find `user2.txt` which contain's a flag. 

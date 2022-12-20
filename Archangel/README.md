@@ -137,7 +137,7 @@ http://mafialive.thm/test.php?view=/var/www/html/development_testing/../../../..
 
 Now when you go back and check the log, the contents of `/etc/passwd` should be in the location of that request's `User-Agent`.
 
-We only have to poison the log in one place, one time, and every time we enter that command, the poisoned location will be updated. 
+We only have to poison the log in one place, one time, and every time we enter that URL parameter, the poisoned location will be updated. 
 
 *Note: To manipulate the header information (where the User-Agent is stored), you will need a tool like BurpSuite or to send the request using Python, PHP, Go, etc.*
 
@@ -150,3 +150,24 @@ Getting that flag was good, but we don't really have much leverage on this machi
 ![crontab](../media/pictures/archangel_crontab.png)
 
 When we take a look at the file referenced, we notice we have write permissions, meaning we can insert a reverse shell or our own script to gain a shell as `Archangel`.  All we have to do is overwrite the existing `/opt/helloworld.sh` file and wait for the cron job to run, then we will become `Archangel`. After we gain the shell we can navigate back to `/home/archangel` and look in `secret` to find `user2.txt` which contain's a flag. 
+
+## Privilege Escalation (Root)
+
+After grabbing the flag from `user2.txt` we can see there is a file called `backup` in the same directory, owned by root, with the SUID bit set. Running `file` on it shows it is an `ELF` binary. If we run `strings` on it we can find something interesting: it is executing a `cp` with a relative path to the binary.
+
+![backupStrings](../media/pictures/archangel_backup_strings.png)
+
+The use of this relative path allows us to point the binary to a `cp` binary created by us, allowing us to execute commands as root.  We can create a basic shell script like this:
+
+```bash
+echo "#!/bin/bash\n/bin/bash" > cp
+chmod +x cp
+```
+
+Next we have to alter our `PATH` to lookin `/home/archangel/secret` for our malicious `cp` file. 
+
+```bash
+export PATH=/home/archangel/secret:$PATH
+```
+
+After that, we can run the `backup` binary and drop into a root shell.  Once we have a root shell, we can navigate to `/root` and read the flag from `root.txt`. 

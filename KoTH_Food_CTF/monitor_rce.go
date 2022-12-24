@@ -318,6 +318,8 @@ func main() {
 	}
 
 	PrintChar('=', 60)
+	PrintCenter("Argument Info", 60)
+	PrintChar('=', 60)
 	InfMsg(fmt.Sprintf("Target Domain: %s", domain))
 	InfMsg(fmt.Sprintf("Target Port: %d", port))
 	InfMsg(fmt.Sprintf("HTTPS: %v", secure))
@@ -351,16 +353,16 @@ func main() {
 		ErrMsg(message)
 		os.Exit(1)
 	}
+	SucMsg(message)
 
 	if len(output) > 0 {
+		PrintChar(' ', 1)
 		PrintChar('-', 60)
 		PrintCenter("Command Output", 60)
 		PrintChar('-', 60)
 		fmt.Printf("%s\n", output)
-	} else {
-		SucMsg(message)
+		PrintChar('-', 60)
 	}
-
 	return
 }
 

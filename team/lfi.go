@@ -544,6 +544,46 @@ func SanitizeParamname(paramname string) (sanitized string, err error) {
 	return sanitized, nil
 }
 
+// ============================================================
+//
+// Function Name: SaveRSA
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//  Function designed to save file contents in a file named
+//  id_rsa and set the user permissions to 0600 so the file
+//  can be specified as an SSH key file.
+//
+// Input(s):
+//
+//  rsakey - string. key contents to be saved in id_rsa.
+//
+// Return(s):
+//
+//  success - bool. indication of success.
+//  message - string. status message.
+//
+// ============================================================
+func SaveRSA(rsakey string) (success bool, message string) {
+	var err error
+	const filename string = "id_rsa"
+	var fptr *os.File
+
+	SysMsgNB(fmt.Sprintf("creating \"%s\" file ...", filename))
+	fptr, err = os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, os.FileMode(0600))
+	if err != nil {
+		return false, err.Error()
+	}
+	defer fptr.Close()
+
+	SysMsgNB(fmt.Sprintf("writing content to \"%s\" ...", filename))
+	fmt.Fprintf(fptr, "%s\n", rsakey)
+
+	return true, fmt.Sprintf("\"%s\" successfully created", filename)
+}
+
 func init() {
 	return
 }
@@ -563,6 +603,7 @@ func main() {
 	var err error
 
 	var filecontents string
+	var rsadata string
 
 	var client Client = Client{Session: &http.Client{Timeout: 10 * time.Second}}
 
@@ -631,6 +672,29 @@ func main() {
 	PrintChar('-', 60)
 	fmt.Printf("%s\n", filecontents)
 	PrintChar('-', 60)
+
+	SysMsgNB("checking for RSA key ...")
+	rsadata, success, message = FindMatch([]byte(filecontents), "[-]+BEGIN OPENSSH PRIVATE KEY.*(.*\n)+.*END OPENSSH PRIVATE KEY[-]+")
+	if !success {
+		ErrMsg(message)
+		os.Exit(0)
+	}
+	SucMsg(message)
+
+	rsadata = strings.Replace(rsadata, "#", "", -1)
+
+	PrintChar('-', 60)
+	PrintCenter("RSA Key", 60)
+	PrintChar('-', 60)
+	fmt.Printf("%s\n", rsadata)
+	PrintChar('-', 60)
+
+	success, message = SaveRSA(rsadata)
+	if !success {
+		ErrMsg(message)
+		os.Exit(0)
+	}
+	SucMsg(message)
 
 	return
 }

@@ -441,10 +441,10 @@ func main() {
 		InfMsg("Target File: ThinVnc.ini")
 	} else {
 		InfMsg(fmt.Sprintf("TargetFile: %s", targetfile))
+		InfMsg(fmt.Sprintf("Traversal Depth: %d", depth))
 	}
 
 	InfMsg(fmt.Sprintf("HTTPS: %v", secure))
-	InfMsg(fmt.Sprintf("Traversal Depth: %d", depth))
 	PrintChar('=', 60)
 
 	//============================================================

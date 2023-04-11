@@ -653,6 +653,7 @@ func StartListener(ip string, port int, wg *sync.WaitGroup) (err error) {
 
 	http.Handle("/", http.StripPrefix("/", fs))
 
+	SucMsg(fmt.Sprintf("fileserver being hosted at %s:%d", ip, port))
 	if err = SRV.ListenAndServe(); err != http.ErrServerClosed {
 		ErrMsg(err.Error())
 		return err
@@ -756,6 +757,7 @@ func main() {
 	if len(c2ip) > 0 {
 		go StartListener(c2ip, c2p, nil)
 		defer SRV.Close()
+		time.Sleep(time.Millisecond * 250)
 	}
 
 	//============================================================

@@ -683,7 +683,10 @@ func main() {
 	var c2ip string
 	var c2p int
 
-	var client Client = Client{Session: &http.Client{Timeout: 10 * time.Second}}
+	var proxyaddr string
+
+	var transport http.Transport = http.Transport{}
+	var client Client = Client{Session: &http.Client{Timeout: 10 * time.Second, Transport: &transport}}
 	var command string
 	var output string
 
@@ -693,6 +696,7 @@ func main() {
 	flag.BoolVar(&secure, "secure", false, "use HTTPS instead of HTTP")
 	flag.StringVar(&c2ip, "c2ip", "", "ip, domain, or interface of C2 server")
 	flag.IntVar(&c2p, "c2port", 9999, "port to contact c2 server on")
+	flag.StringVar(&proxyaddr, "proxy", "", "proxy to use when making requests (http://...)")
 	flag.BoolVar(&iface, "interface", false, "c2ip specified is network interface")
 	flag.StringVar(&client.Login.Username, "U", "admin", "username to authenticate with")
 	flag.StringVar(&client.Login.Password, "P", "admin", "password to authenticate with")
@@ -728,6 +732,30 @@ func main() {
 
 	}
 
+	if len(proxyaddr) > 0 {
+		var proxyurl *url.URL = &url.URL{}
+		var proxysplit []string = strings.Split(proxyaddr, "://")
+		var hostsplit []string
+		var hostroute string
+
+		if len(proxysplit) < 2 {
+			ErrMsg("proxy must be in form \"http://<address>\" or \"https://<address>\"")
+			os.Exit(1)
+		}
+
+		proxyurl.Scheme = proxysplit[0]
+
+		hostsplit = strings.Split(proxysplit[1], "/")
+		proxyurl.Host = hostsplit[0]
+
+		if len(hostsplit) > 1 {
+			hostroute = strings.Join(hostsplit[1:], "/")
+			proxyurl.Path = hostroute
+		}
+
+		transport.Proxy = http.ProxyURL(proxyurl)
+	}
+
 	PrintChar('=', 60)
 	PrintCenter("Target Information", 60)
 	PrintChar('=', 60)
@@ -738,6 +766,10 @@ func main() {
 	if len(c2ip) > 0 {
 		InfMsg(fmt.Sprintf("C2IP: %s", c2ip))
 		InfMsg(fmt.Sprintf("C2Port: %d", c2p))
+	}
+
+	if len(proxyaddr) > 0 {
+		InfMsg(fmt.Sprintf("Proxy: %s", proxyaddr))
 	}
 
 	PrintChar('=', 60)

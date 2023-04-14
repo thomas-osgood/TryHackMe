@@ -37,6 +37,15 @@ class Marsoc:
         self.__shellfile = str()
         return
 
+    def __del__(self):
+        success, message = self.Cleanup()
+        if not(success):
+            ErrMsg(message)
+        else:
+            SucMsg(message)
+
+        return
+
     def __BuildShell(self):
         message = str()
         shellcontent = bytes()
@@ -74,6 +83,27 @@ class Marsoc:
             self.__headers["Authorization"] = f"Basic {authstring64}"
 
             message = "headers successfully set"
+            success = True
+        except Exception as ex:
+            message = str(ex)
+            success = False
+
+        return (success, message)
+
+    def Cleanup(self):
+        message = str()
+        success = bool()
+
+        try:
+            if os.path.isfile(self.__shellfile):
+                SysMsgNB(f"removing \"{self.__shellfile}\" ...")
+                try:
+                    os.remove(self.__shellfile)
+                    SucMsg(f"\"{self.__shellfile}\" successfully deleted")
+                except Exception as ex:
+                    ErrMsg(str(ex))
+
+            message = "cleanup successful"
             success = True
         except Exception as ex:
             message = str(ex)

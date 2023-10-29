@@ -5,6 +5,10 @@
 Utilizing [practicum.py](practicum.py):
 
 ```bash
+# save the IP address of the box in the TARGET
+# environment variable
+export TARGET=<target_ip_address_here>
+
 # this will execute the attack using the default
 # username "random".
 python3 practicum.py $TARGET 80

@@ -37,7 +37,7 @@ def main():
                 # decrypt the string.
                 testres = str()
                 for i in range(0,len(stage1)):
-                    testres += chr(ord(stage1[i]) ^ ord(testkey[i%5]))
+                    testres += chr(ord(stage1[i]) ^ ord(testkey[i%keylen]))
 
                 # test for correct decryption. if a match has been found, set the
                 # key and flag values and break the loop.

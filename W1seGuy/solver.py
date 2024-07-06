@@ -23,7 +23,7 @@ def main():
             # calculate the partial key based on known info (the format of the flag)
             partialkey = str()
             for i in range(0,len(firstfour)):
-                partialkey += chr(ord(stage1[i]) ^ ord(firstfour[i%5]))
+                partialkey += chr(ord(stage1[i]) ^ ord(firstfour[i%keylen]))
 
             # brute force the key and flag by using regular expression matching.
             # this will loop through all possible values for the 5th letter in 

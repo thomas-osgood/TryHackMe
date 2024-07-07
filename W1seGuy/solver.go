@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"regexp"
 	"strings"
 )
@@ -12,8 +14,10 @@ import (
 const alphabet string = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 type Decoder struct {
+	conn    net.Conn
+	encoded string
 	Key     string
-	Encoded string
+	Target  string
 }
 
 func (d *Decoder) checkString(decoded string) (err error) {
@@ -34,6 +38,11 @@ func (d *Decoder) checkString(decoded string) (err error) {
 	return nil
 }
 
+func (d *Decoder) connect() (err error) {
+	d.conn, err = net.Dial("tcp", d.Target)
+	return err
+}
+
 func (d *Decoder) decrypt() (decrypted string, err error) {
 	var calculated byte
 	var keybytes []byte
@@ -46,7 +55,7 @@ func (d *Decoder) decrypt() (decrypted string, err error) {
 		return "", err
 	}
 
-	raw, err = hex.DecodeString(d.Encoded)
+	raw, err = hex.DecodeString(d.encoded)
 	if err != nil {
 		return "", err
 	}
@@ -61,6 +70,57 @@ func (d *Decoder) decrypt() (decrypted string, err error) {
 	return decrypted, nil
 }
 
+// reference:
+//
+// https://www.developer.com/languages/intro-socket-programming-go/
+func (d *Decoder) getEncrypted() (err error) {
+	var mBuff []byte = make([]byte, 4096)
+	var nRead int = 0
+
+	nRead, err = d.conn.Read(mBuff)
+	if err != nil {
+		return err
+	}
+
+	d.encoded = string(bytes.TrimSpace(bytes.Split(mBuff[:nRead], []byte(":"))[1]))
+
+	return nil
+}
+
+func (d *Decoder) getFlag2() (flag2 string, err error) {
+	var keydec []byte
+	var mBuff []byte = make([]byte, 1024)
+	var nRead int = 0
+
+	keydec, err = hex.DecodeString(d.Key)
+	if err != nil {
+		return "", err
+	}
+	keydec = append(keydec, '\n')
+
+	// read the server prompt asking for the key.
+	_, err = d.conn.Read(mBuff)
+	if err != nil {
+		return "", err
+	}
+
+	// send the key to the server.
+	nRead, err = d.conn.Write(keydec)
+	if err != nil {
+		return "", err
+	}
+
+	// read the server response.
+	nRead, err = d.conn.Read(mBuff)
+	if err != nil {
+		return "", err
+	}
+
+	flag2 = string(bytes.TrimSpace(bytes.Split(mBuff[:nRead], []byte(":"))[1]))
+
+	return flag2, nil
+}
+
 func (d *Decoder) leakInfo() (keyinfo string, err error) {
 	var calc byte
 	var dec []byte
@@ -68,7 +128,7 @@ func (d *Decoder) leakInfo() (keyinfo string, err error) {
 	var pat []byte = []byte("THM{")
 	var raw []byte = make([]byte, 0)
 
-	dec, err = hex.DecodeString(d.Encoded)
+	dec, err = hex.DecodeString(d.encoded)
 	if err != nil {
 		return "", err
 	}
@@ -85,16 +145,27 @@ func (d *Decoder) leakInfo() (keyinfo string, err error) {
 	return keyinfo, nil
 }
 
-func (d *Decoder) BruteKey() (flag string, err error) {
+func (d *Decoder) BruteKey() (flag string, flag2 string, err error) {
 	var bytekey []byte = make([]byte, 10)
 	var decrypted string
 	var found bool = false
 	var i int
 	var keyinfo string
 
+	err = d.connect()
+	if err != nil {
+		return "", "", err
+	}
+	defer d.conn.Close()
+
+	err = d.getEncrypted()
+	if err != nil {
+		return "", "", err
+	}
+
 	keyinfo, err = d.leakInfo()
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	for i = 0; i < len(alphabet); i++ {
@@ -114,10 +185,15 @@ func (d *Decoder) BruteKey() (flag string, err error) {
 
 	if !found {
 		d.Key = ""
-		return "", fmt.Errorf("flag not found")
+		return "", "", fmt.Errorf("flag not found")
 	}
 
-	return decrypted, nil
+	flag2, err = d.getFlag2()
+	if err != nil {
+		return "", "", err
+	}
+
+	return decrypted, flag2, nil
 }
 
 func init() {}
@@ -126,17 +202,21 @@ func main() {
 	var decoder Decoder = Decoder{}
 	var err error
 	var flagstr string
+	var flag2str string
 	var keydec []byte
+	var target string
 
-	flag.StringVar(&decoder.Encoded, "e", "", "hex encoded string to decrypt")
+	flag.StringVar(&target, "t", "", "address (ip:port) of target server")
 	flag.Parse()
 
-	decoder.Encoded = strings.TrimSpace(decoder.Encoded)
-	if len(decoder.Encoded) < 1 {
-		log.Fatalf("no encoded string specified...")
+	target = strings.TrimSpace(target)
+	if len(target) < 1 {
+		log.Fatalf("no target specified...")
 	}
 
-	flagstr, err = decoder.BruteKey()
+	decoder.Target = target
+
+	flagstr, flag2str, err = decoder.BruteKey()
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -148,5 +228,6 @@ func main() {
 
 	log.Printf("Key: %s\n", string(keydec))
 	log.Printf("Flag: %s\n", flagstr)
+	log.Printf("Flag2: %s\n", flag2str)
 }
 

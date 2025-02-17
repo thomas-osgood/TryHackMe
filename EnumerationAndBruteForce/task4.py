@@ -91,8 +91,7 @@ class Resetter:
     def __login(self, new_password):
         """
         function designed to login to the application
-        using the password acquired from the reset attack
-        and grab the flag.
+        using the password acquired from the reset attack.
         """
         err = None
         target = f"{self.__baseurl}/functions.php"
@@ -115,8 +114,8 @@ class Resetter:
     def __make_request(self, test_num):
         """
         function designed to make a request to the reset
-        endpoint and return the length. this length will
-        help determine if the token value is valid or not.
+        endpoint and return the text. this text will
+        be used to determine if the token value is valid or not.
         """
         body_txt = str()
         err = None
